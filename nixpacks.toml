@@ -6,9 +6,6 @@
 # fixamos as versões e comandos para builds determinísticos.
 # ================================================================
 
-[providers]
-providers = []
-
 [phases.setup]
 # Node.js é necessário para rodar o servidor Next.js standalone
 nixPkgs = ["nodejs_22"]
