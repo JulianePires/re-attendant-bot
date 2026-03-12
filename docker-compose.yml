@@ -1,0 +1,38 @@
+# ================================================================
+# AMBIENTE DE DESENVOLVIMENTO LOCAL
+#
+# Sobe um PostgreSQL local equivalente ao Supabase de produção.
+# Não inclui Realtime (WebSockets) — para desenvolver hooks de
+# fila, use o projeto Supabase remotamente ou o Supabase CLI.
+#
+# Uso:
+#   docker compose up -d        → sobe em background
+#   docker compose down         → para e remove os containers
+#   docker compose down -v      → para, remove containers E volume (apaga dados)
+# ================================================================
+
+services:
+  postgres:
+    image: postgres:16-alpine
+    container_name: re_attendant_db
+    restart: unless-stopped
+    environment:
+      POSTGRES_USER: postgres
+      POSTGRES_PASSWORD: postgres
+      POSTGRES_DB: re_attendant
+    ports:
+      # Porta local:porta do container
+      # Acesse com: postgresql://postgres:postgres@localhost:5432/re_attendant
+      - "5432:5432"
+    volumes:
+      # Persiste os dados entre reinicializações do container
+      - postgres_data:/var/lib/postgresql/data
+    healthcheck:
+      test: ["CMD-SHELL", "pg_isready -U postgres -d re_attendant"]
+      interval: 10s
+      timeout: 5s
+      retries: 5
+
+volumes:
+  postgres_data:
+    driver: local
