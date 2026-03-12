@@ -1,0 +1,114 @@
+// Documentação: https://pris.ly/d/prisma-schema
+
+generator client {
+  provider = "prisma-client-js"
+}
+
+datasource db {
+  provider  = "postgresql"
+  // DATABASE_URL aponta para o pooler do Supabase (usado em runtime pela aplicação)
+  url       = env("DATABASE_URL")
+  // DIRECT_URL ignora o pooler e conecta diretamente ao banco (necessário para executar migrações)
+  directUrl = env("DIRECT_URL")
+}
+
+// ================================================================
+// TABELAS DO BETTERAUTH
+// Estas tabelas são gerenciadas pelo framework. Os nomes de campo
+// seguem a convenção camelCase do Prisma, mapeados para snake_case
+// no banco via @@map e @map.
+// ================================================================
+
+model User {
+  id            String    @id
+  name          String
+  email         String    @unique
+  emailVerified Boolean
+  image         String?
+  createdAt     DateTime
+  updatedAt     DateTime
+
+  // Campos adicionados pelo plugin de Admin do BetterAuth para RBAC.
+  // O plugin gerencia automaticamente a atribuição de roles.
+  role      String?   @default("paciente")
+  banned    Boolean?
+  banReason String?
+  banExpires DateTime?
+
+  // Campos customizados da clínica
+  cpf          String    @unique
+  ultimoAcesso DateTime?
+
+  // Relações
+  sessions     Session[]
+  accounts     Account[]
+  atendimentos Atendimento[]
+
+  @@map("user")
+}
+
+model Session {
+  id        String   @id
+  expiresAt DateTime
+  token     String   @unique
+  createdAt DateTime
+  updatedAt DateTime
+  ipAddress String?
+  userAgent String?
+  userId    String
+  user      User     @relation(fields: [userId], references: [id], onDelete: Cascade)
+
+  @@map("session")
+}
+
+model Account {
+  id                    String    @id
+  accountId             String
+  providerId            String
+  userId                String
+  user                  User      @relation(fields: [userId], references: [id], onDelete: Cascade)
+  accessToken           String?
+  refreshToken          String?
+  idToken               String?
+  accessTokenExpiresAt  DateTime?
+  refreshTokenExpiresAt DateTime?
+  scope                 String?
+  password              String?
+  createdAt             DateTime
+  updatedAt             DateTime
+
+  @@map("account")
+}
+
+model Verification {
+  id         String    @id
+  identifier String
+  value      String
+  expiresAt  DateTime
+  createdAt  DateTime?
+  updatedAt  DateTime?
+
+  @@map("verification")
+}
+
+// ================================================================
+// TABELAS DE NEGÓCIO
+// ================================================================
+
+model Atendimento {
+  id         String   @id @default(cuid())
+  pacienteId String
+  paciente   User     @relation(fields: [pacienteId], references: [id], onDelete: Cascade)
+
+  // Discriminadores de tipo: 'normal' | 'urgente'
+  tipoChamada String @default("normal")
+  // Máquina de estados simples: 'aguardando' | 'finalizado'
+  status      String @default("aguardando")
+
+  criadoEm    DateTime  @default(now())
+  finalizadoEm DateTime?
+
+  // Índice composto para queries de fila (status + criadoEm é o padrão de ordenação)
+  @@index([status, criadoEm])
+  @@map("atendimento")
+}
