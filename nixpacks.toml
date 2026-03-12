@@ -1,0 +1,35 @@
+# ================================================================
+# NIXPACKS — Configuração de Build para Coolify
+#
+# Coolify usa Nixpacks por padrão para detectar e compilar apps.
+# A presença do bun.lock já faz com que ele use o Bun, mas aqui
+# fixamos as versões e comandos para builds determinísticos.
+# ================================================================
+
+[providers]
+providers = []
+
+[phases.setup]
+# Node.js é necessário para rodar o servidor Next.js standalone
+nixPkgs = ["nodejs_22"]
+
+[phases.install]
+cmds = ["bun install --frozen-lockfile"]
+
+[phases.build]
+# 1. Gera o Prisma Client com os tipos TypeScript corretos
+# 2. Compila o Next.js (output: standalone → .next/standalone/server.js)
+# 3. Copia assets estáticos para dentro do bundle standalone
+#    (obrigatório: o servidor standalone não serve arquivos do diretório pai)
+# ATENÇÃO: migrações NÃO rodam aqui. Configure no Coolify:
+#   Pre-deploy Command → bunx prisma migrate deploy
+cmds = [
+  "bunx prisma generate",
+  "bun run build",
+  "cp -r .next/static .next/standalone/.next/static",
+  "cp -r public .next/standalone/public",
+]
+
+[start]
+# Inicia o servidor Next.js standalone (sem depender do node_modules raiz)
+cmd = "node .next/standalone/server.js"
