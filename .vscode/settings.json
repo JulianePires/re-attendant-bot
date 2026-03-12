@@ -1,0 +1,7 @@
+{
+  "terminal.integrated.env.linux": {
+    "PATH": "/home/piresjuliane/.bun/bin:${env:PATH}",
+    "NPM_CONFIG_USERCONFIG": "${workspaceFolder}/.npmrc",
+    "NPM_CONFIG_GLOBALCONFIG": "/dev/null"
+  }
+}
