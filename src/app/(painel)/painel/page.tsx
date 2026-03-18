@@ -1,74 +1,25 @@
+"use client";
+
 import { Clock, CheckCircle2, AlertCircle, User } from "lucide-react";
+import { useMutation, useQuery, useQueryClient } from "@tanstack/react-query";
+import type { AtendimentoNaFila, TipoChamadaValue } from "@/types";
 import { cn } from "@/lib/utils";
-
-// ================================================================
-// Tipos e dados mockados
-// Substituir pelo hook useRealtimeQueue (React Query + Supabase
-// Realtime) no próximo passo de desenvolvimento.
-// ================================================================
-
-type TipoChamada = "normal" | "urgente";
-type StatusAtendimento = "aguardando" | "finalizado";
-
-interface ItemFila {
-  id: string;
-  nome: string;
-  tipoChamada: TipoChamada;
-  criadoEm: string;
-  posicao: number;
-}
-
-interface Atendimento {
-  id: string;
-  nome: string;
-  tipoChamada: TipoChamada;
-  status: StatusAtendimento;
-  finalizadoEm: string;
-}
-
-const FILA_MOCK: ItemFila[] = [
-  { id: "1", posicao: 1, nome: "Maria Souza", tipoChamada: "urgente", criadoEm: "14:22" },
-  { id: "2", posicao: 2, nome: "João Silva", tipoChamada: "normal", criadoEm: "14:30" },
-  { id: "3", posicao: 3, nome: "Carlos Pereira", tipoChamada: "normal", criadoEm: "14:38" },
-  { id: "4", posicao: 4, nome: "Fernanda Lima", tipoChamada: "normal", criadoEm: "14:45" },
-];
-
-const HISTORICO_MOCK: Atendimento[] = [
-  {
-    id: "h1",
-    nome: "Ana Costa",
-    tipoChamada: "normal",
-    status: "finalizado",
-    finalizadoEm: "14:18",
-  },
-  {
-    id: "h2",
-    nome: "Roberto Dias",
-    tipoChamada: "urgente",
-    status: "finalizado",
-    finalizadoEm: "13:55",
-  },
-  {
-    id: "h3",
-    nome: "Luísa Ferreira",
-    tipoChamada: "normal",
-    status: "finalizado",
-    finalizadoEm: "13:40",
-  },
-  {
-    id: "h4",
-    nome: "Pedro Alves",
-    tipoChamada: "normal",
-    status: "finalizado",
-    finalizadoEm: "13:20",
-  },
-];
+import {
+  obterFilaAtiva,
+  obterAtendimentosDoDia,
+  finalizarAtendimento,
+} from "@/server/actions/atendimento";
+import {
+  useRealtimeQueue,
+  FILA_ATIVA_QUERY_KEY,
+  ATENDIMENTOS_DIA_QUERY_KEY,
+} from "@/hooks/useRealtimeQueue";
 
 // ================================================================
 // Subcomponentes
 // ================================================================
 
-function BadgeTipo({ tipo }: { tipo: TipoChamada }) {
+function BadgeTipo({ tipo }: { tipo: TipoChamadaValue }) {
   return (
     <span
       className={cn(
@@ -82,7 +33,15 @@ function BadgeTipo({ tipo }: { tipo: TipoChamada }) {
   );
 }
 
-function CartaoFila({ item }: { item: ItemFila }) {
+function CartaoFila({
+  item,
+  onAtender,
+  isLoading,
+}: {
+  item: AtendimentoNaFila & { posicao: number };
+  onAtender: (id: string) => void;
+  isLoading: boolean;
+}) {
   return (
     <li
       className={cn(
@@ -103,28 +62,32 @@ function CartaoFila({ item }: { item: ItemFila }) {
 
       {/* Dados do paciente */}
       <div className="flex min-w-0 flex-1 flex-col gap-0.5">
-        <p className="truncate text-sm font-semibold text-slate-800">{item.nome}</p>
+        <p className="truncate text-sm font-semibold text-slate-800">
+          {item.paciente?.name ?? "Paciente"}
+        </p>
         <div className="flex items-center gap-2">
           <BadgeTipo tipo={item.tipoChamada} />
           <span className="flex items-center gap-1 text-xs text-slate-400">
             <Clock className="h-3 w-3" aria-hidden="true" />
-            {item.criadoEm}
+            {formatarHorario(item.criadoEm)}
           </span>
         </div>
       </div>
 
       {/* Ação — será ligada ao Server Action de chamada */}
       <button
-        className="shrink-0 rounded-lg bg-blue-600 px-3 py-1.5 text-xs font-semibold text-white transition-colors hover:bg-blue-700 focus-visible:ring-2 focus-visible:ring-blue-500 focus-visible:outline-none"
-        aria-label={`Chamar ${item.nome}`}
+        className="shrink-0 rounded-lg bg-blue-600 px-3 py-1.5 text-xs font-semibold text-white transition-colors hover:bg-blue-700 focus-visible:ring-2 focus-visible:ring-blue-500 focus-visible:outline-none disabled:cursor-not-allowed disabled:bg-blue-300"
+        aria-label={`Chamar ${item.paciente?.name ?? "Paciente"}`}
+        onClick={() => onAtender(item.id)}
+        disabled={isLoading}
       >
-        Chamar
+        {isLoading ? "Atendendo..." : "Atender"}
       </button>
     </li>
   );
 }
 
-function CartaoHistorico({ atendimento }: { atendimento: Atendimento }) {
+function CartaoHistorico({ atendimento }: { atendimento: AtendimentoNaFila }) {
   return (
     <li className="flex items-center gap-3 rounded-xl border bg-white p-3.5 shadow-sm">
       <div className="flex h-8 w-8 shrink-0 items-center justify-center rounded-full bg-green-100">
@@ -132,14 +95,24 @@ function CartaoHistorico({ atendimento }: { atendimento: Atendimento }) {
       </div>
 
       <div className="flex min-w-0 flex-1 flex-col gap-0.5">
-        <p className="truncate text-sm font-medium text-slate-700">{atendimento.nome}</p>
+        <p className="truncate text-sm font-medium text-slate-700">
+          {atendimento.paciente?.name ?? "Paciente"}
+        </p>
         <div className="flex items-center gap-2">
           <BadgeTipo tipo={atendimento.tipoChamada} />
-          <span className="text-xs text-slate-400">{atendimento.finalizadoEm}</span>
+          <span className="text-xs text-slate-400">
+            {formatarHorario(atendimento.finalizadoEm)}
+          </span>
         </div>
       </div>
     </li>
   );
+}
+
+function formatarHorario(valor: Date | string | null | undefined) {
+  if (!valor) return "--:--";
+  const data = typeof valor === "string" ? new Date(valor) : valor;
+  return data.toLocaleTimeString("pt-BR", { hour: "2-digit", minute: "2-digit" });
 }
 
 // ================================================================
@@ -147,8 +120,54 @@ function CartaoHistorico({ atendimento }: { atendimento: Atendimento }) {
 // ================================================================
 
 export default function PainelDashboardPage() {
-  const totalHoje = HISTORICO_MOCK.length;
-  const urgentesHoje = HISTORICO_MOCK.filter((a) => a.tipoChamada === "urgente").length;
+  const queryClient = useQueryClient();
+
+  const {
+    data: filaAtiva = [],
+    isLoading: filaLoading,
+    isError: filaError,
+  } = useQuery({
+    queryKey: FILA_ATIVA_QUERY_KEY,
+    queryFn: obterFilaAtiva,
+  });
+
+  const {
+    data: atendimentosDia = [],
+    isLoading: historicoLoading,
+    isError: historicoError,
+  } = useQuery({
+    queryKey: ATENDIMENTOS_DIA_QUERY_KEY,
+    queryFn: obterAtendimentosDoDia,
+  });
+
+  useRealtimeQueue(queryClient);
+
+  const finalizarMutation = useMutation({
+    mutationFn: (atendimentoId: string) => finalizarAtendimento(atendimentoId),
+    // Otimismo: removemos da fila antes do servidor responder para manter o painel fluido.
+    onMutate: async (atendimentoId) => {
+      await queryClient.cancelQueries({ queryKey: FILA_ATIVA_QUERY_KEY });
+      const anterior = queryClient.getQueryData<AtendimentoNaFila[]>(FILA_ATIVA_QUERY_KEY) ?? [];
+
+      queryClient.setQueryData<AtendimentoNaFila[]>(FILA_ATIVA_QUERY_KEY, (old = []) =>
+        old.filter((item) => item.id !== atendimentoId)
+      );
+
+      return { anterior };
+    },
+    onError: (_erro, _vars, contexto) => {
+      if (contexto?.anterior) {
+        queryClient.setQueryData(FILA_ATIVA_QUERY_KEY, contexto.anterior);
+      }
+    },
+    onSettled: () => {
+      queryClient.invalidateQueries({ queryKey: FILA_ATIVA_QUERY_KEY });
+      queryClient.invalidateQueries({ queryKey: ATENDIMENTOS_DIA_QUERY_KEY });
+    },
+  });
+
+  const totalHoje = atendimentosDia.length;
+  const urgentesHoje = atendimentosDia.filter((a) => a.tipoChamada === "urgente").length;
 
   return (
     <div className="space-y-6">
@@ -164,7 +183,7 @@ export default function PainelDashboardPage() {
       <div className="grid grid-cols-3 gap-4">
         <div className="rounded-xl border bg-white p-5 shadow-sm">
           <p className="text-xs font-medium tracking-wide text-slate-400 uppercase">Na fila</p>
-          <p className="mt-1 text-3xl font-bold text-blue-600">{FILA_MOCK.length}</p>
+          <p className="mt-1 text-3xl font-bold text-blue-600">{filaAtiva.length}</p>
         </div>
         <div className="rounded-xl border bg-white p-5 shadow-sm">
           <p className="text-xs font-medium tracking-wide text-slate-400 uppercase">
@@ -193,24 +212,38 @@ export default function PainelDashboardPage() {
               Fila de Espera
               {/* Badge com contagem — ficará reativo ao Realtime */}
               <span className="ml-1 rounded-full bg-blue-100 px-2 py-0.5 text-xs font-bold text-blue-700">
-                {FILA_MOCK.length}
+                {filaAtiva.length}
               </span>
             </h2>
             <span className="text-xs text-slate-400">
-              {/* TODO: "Atualizado há X seg" via useRealtimeQueue */}
-              Dados mock
+              {filaLoading ? "Atualizando..." : "Em tempo real"}
             </span>
           </div>
 
-          {FILA_MOCK.length === 0 ? (
+          {filaError ? (
+            <div className="flex h-48 flex-col items-center justify-center rounded-xl border border-dashed bg-white text-slate-400">
+              <AlertCircle className="mb-2 h-8 w-8 text-red-400" />
+              <p className="text-sm">Erro ao carregar a fila ativa</p>
+            </div>
+          ) : filaLoading ? (
+            <div className="flex h-48 flex-col items-center justify-center rounded-xl border border-dashed bg-white text-slate-400">
+              <Clock className="mb-2 h-8 w-8" />
+              <p className="text-sm">Carregando fila...</p>
+            </div>
+          ) : filaAtiva.length === 0 ? (
             <div className="flex h-48 flex-col items-center justify-center rounded-xl border border-dashed bg-white text-slate-400">
               <CheckCircle2 className="mb-2 h-8 w-8 text-green-400" />
               <p className="text-sm">Fila vazia — nenhum paciente aguardando</p>
             </div>
           ) : (
             <ul className="space-y-2.5" aria-label="Pacientes aguardando atendimento">
-              {FILA_MOCK.map((item) => (
-                <CartaoFila key={item.id} item={item} />
+              {filaAtiva.map((item, index) => (
+                <CartaoFila
+                  key={item.id}
+                  item={{ ...item, posicao: index + 1 }}
+                  onAtender={(id) => finalizarMutation.mutate(id)}
+                  isLoading={finalizarMutation.isPending}
+                />
               ))}
             </ul>
           )}
@@ -231,14 +264,24 @@ export default function PainelDashboardPage() {
             </h2>
           </div>
 
-          {HISTORICO_MOCK.length === 0 ? (
+          {historicoError ? (
+            <div className="flex h-48 flex-col items-center justify-center rounded-xl border border-dashed bg-white text-slate-400">
+              <AlertCircle className="mb-2 h-8 w-8 text-red-400" />
+              <p className="text-sm">Erro ao carregar atendimentos do dia</p>
+            </div>
+          ) : historicoLoading ? (
+            <div className="flex h-48 flex-col items-center justify-center rounded-xl border border-dashed bg-white text-slate-400">
+              <Clock className="mb-2 h-8 w-8" />
+              <p className="text-sm">Carregando atendimentos...</p>
+            </div>
+          ) : atendimentosDia.length === 0 ? (
             <div className="flex h-48 flex-col items-center justify-center rounded-xl border border-dashed bg-white text-slate-400">
               <Clock className="mb-2 h-8 w-8" />
               <p className="text-sm">Nenhum atendimento finalizado ainda</p>
             </div>
           ) : (
             <ul className="space-y-2.5" aria-label="Atendimentos finalizados hoje">
-              {HISTORICO_MOCK.map((atendimento) => (
+              {atendimentosDia.map((atendimento) => (
                 <CartaoHistorico key={atendimento.id} atendimento={atendimento} />
               ))}
             </ul>
