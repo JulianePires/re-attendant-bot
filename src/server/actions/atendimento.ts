@@ -7,6 +7,19 @@ import { StatusAtendimento, TipoChamada } from "@/types";
 const schemaPacienteId = z.string().cuid("ID de paciente inválido");
 const schemaAtendimentoId = z.string().cuid("ID de atendimento inválido");
 
+const schemaAtendimentoNaFila = z.object({
+  id: z.string(),
+  pacienteId: z.string(),
+  paciente: z.object({
+    id: z.string(),
+    name: z.string(),
+  }),
+  tipoChamada: z.enum([TipoChamada.NORMAL, TipoChamada.URGENTE]),
+  status: z.enum([StatusAtendimento.AGUARDANDO, StatusAtendimento.FINALIZADO]),
+  criadoEm: z.date(),
+  finalizadoEm: z.date().nullable(),
+});
+
 export async function entrarNaFila(pacienteId: string) {
   try {
     const pacienteIdValidado = schemaPacienteId.parse(pacienteId);
@@ -60,7 +73,7 @@ export async function finalizarAtendimento(atendimentoId: string) {
 
 export async function obterFilaAtiva() {
   try {
-    return await prisma.atendimento.findMany({
+    const atendimentos = await prisma.atendimento.findMany({
       where: { status: StatusAtendimento.AGUARDANDO },
       orderBy: { criadoEm: "asc" },
       include: {
@@ -72,6 +85,8 @@ export async function obterFilaAtiva() {
         },
       },
     });
+
+    return atendimentos.map((item) => schemaAtendimentoNaFila.parse(item));
   } catch (error) {
     console.error("[obterFilaAtiva]", error);
     throw new Error("Não foi possível carregar a fila ativa.");
@@ -86,7 +101,7 @@ export async function obterAtendimentosDoDia() {
     const fimDoDia = new Date();
     fimDoDia.setHours(23, 59, 59, 999);
 
-    return await prisma.atendimento.findMany({
+    const atendimentos = await prisma.atendimento.findMany({
       where: {
         status: StatusAtendimento.FINALIZADO,
         finalizadoEm: {
@@ -104,6 +119,8 @@ export async function obterAtendimentosDoDia() {
         },
       },
     });
+
+    return atendimentos.map((item) => schemaAtendimentoNaFila.parse(item));
   } catch (error) {
     console.error("[obterAtendimentosDoDia]", error);
     throw new Error("Não foi possível carregar os atendimentos do dia.");
