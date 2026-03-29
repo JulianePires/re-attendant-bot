@@ -4,6 +4,7 @@ import { useState } from "react";
 import { QueryClientProvider } from "@tanstack/react-query";
 import { ReactQueryDevtools } from "@tanstack/react-query-devtools";
 import { criarQueryClient } from "@/lib/query-client";
+import { GlobalOverlayLoader } from "./GlobalOverlayLoader";
 
 // ================================================================
 // PROVIDER DO TANSTACK QUERY
@@ -20,6 +21,7 @@ export function QueryProvider({ children }: { children: React.ReactNode }) {
   return (
     <QueryClientProvider client={queryClient}>
       {children}
+      <GlobalOverlayLoader />
       {/* DevTools visível apenas em desenvolvimento */}
       <ReactQueryDevtools initialIsOpen={false} buttonPosition="bottom-left" />
     </QueryClientProvider>

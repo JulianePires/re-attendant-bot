@@ -2,6 +2,7 @@ import { betterAuth } from "better-auth";
 import { prismaAdapter } from "better-auth/adapters/prisma";
 import { admin } from "better-auth/plugins";
 import { prisma } from "@/lib/prisma";
+import { nextCookies } from "better-auth/next-js";
 
 // ================================================================
 // INICIALIZAÇÃO DO BETTERAUTH
@@ -12,10 +13,13 @@ import { prisma } from "@/lib/prisma";
 // - Para o lado cliente, crie `src/lib/auth-client.ts` com `createAuthClient()`.
 // ================================================================
 
+const isProduction = process.env.NODE_ENV === "production";
+
 export const auth = betterAuth({
   database: prismaAdapter(prisma, {
     provider: "postgresql",
   }),
+  trustedOrigins: ["http://localhost:3000", "https://re-attendant-bot.vercel.app/"],
 
   // Autenticação por e-mail e senha como método primário do sistema.
   // Social providers (Google, etc.) podem ser adicionados aqui no futuro.
@@ -37,6 +41,7 @@ export const auth = betterAuth({
       adminRole: "profissional",
       defaultRole: "paciente",
     }),
+    nextCookies(),
   ],
 
   // Mapeamento dos campos customizados adicionados ao model User no schema.prisma.
@@ -64,6 +69,16 @@ export const auth = betterAuth({
     updateAge: 60 * 60,
     // Sessão expira após 30 dias de inatividade total.
     expiresIn: 60 * 60 * 24 * 30,
+  },
+
+  // ================================================================
+  // CONFIGURAÇÃO DE COOKIES - Segurança em Produção
+  // ================================================================
+  advanced: {
+    useSecureCookies: isProduction,
+    // Cookies com SameSite=Lax previnem CSRF enquanto mantém navegação funcional
+    sameSite: "lax",
+    requestIdHeader: "x-request-id",
   },
 });
 

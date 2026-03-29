@@ -37,4 +37,4 @@ export const supabase = createClient(supabaseUrl, supabaseAnonKey, {
 // HELPER: NOME DO CANAL DA FILA
 // Centraliza o nome do canal para evitar typos nos hooks.
 // ================================================================
-export const CANAL_FILA = "fila-atendimento";
+export const CANAL_FILA = "public:Atendimento";

@@ -19,6 +19,7 @@ export const StatusAtendimento = {
 export const Role = {
   PACIENTE: "paciente",
   PROFISSIONAL: "profissional",
+  ADMIN: "admin",
 } as const;
 
 // ================================================================

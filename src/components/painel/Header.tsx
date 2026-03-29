@@ -1,7 +1,8 @@
-import { Bell } from "lucide-react";
 import { headers } from "next/headers";
 import { auth } from "@/lib/auth";
 import { SignOutButton } from "./SignOutButton";
+import { ThemeToggle } from "@/components/common/atoms/ThemeToggle";
+import { NotificationBell } from "./NotificationBell";
 
 // Header é um Server Component: busca a sessão no servidor sem
 // expor o token ao cliente. O botão de logout é Client Component
@@ -14,21 +15,16 @@ export async function Header() {
   const nome = sessao?.user?.name ?? "Profissional";
 
   return (
-    <header className="flex h-16 shrink-0 items-center justify-between border-b border-slate-200 bg-white px-6">
-      <p className="text-sm text-slate-600">
-        Bom dia, <span className="font-semibold text-slate-900">{nome}</span>
+    <header className="border-border bg-background/80 flex h-16 shrink-0 items-center justify-between border-b px-6 backdrop-blur">
+      <p className="text-muted-foreground text-sm">
+        Bom dia, <span className="text-foreground font-semibold">{nome}</span>
       </p>
 
-      <div className="flex items-center gap-1">
-        {/* Sininho — placeholder para notificações futuras */}
-        <button
-          className="rounded-lg p-2 text-slate-400 transition-colors hover:bg-slate-100 hover:text-slate-600"
-          aria-label="Notificações"
-        >
-          <Bell className="h-4 w-4" aria-hidden="true" />
-        </button>
+      <div className="flex items-center gap-2">
+        <ThemeToggle />
+        {sessao?.user && <NotificationBell />}
 
-        <div className="mx-2 h-5 w-px bg-slate-200" aria-hidden="true" />
+        <div className="bg-border mx-2 h-5 w-px" aria-hidden="true" />
 
         <SignOutButton />
       </div>

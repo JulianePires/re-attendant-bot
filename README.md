@@ -522,6 +522,7 @@ bun run test:coverage     # Cobertura de código
 bun db:generate           # Gera Prisma Client
 bun db:push               # Aplica schema sem migration
 bun db:migrate            # Cria + aplica migration versionada
+bun db:seed               # Cria usuário admin padrão (se banco vazio)
 bun db:studio             # Prisma Studio no browser
 bun db:reset              # Reseta o banco completamente
 
@@ -534,6 +535,19 @@ bun podman:logs           # Tail dos logs do container
 # Git hooks
 bun prepare               # Instala Husky
 ```
+
+### Rotas de autenticação
+
+- `/painel/login`: login de profissionais e admin
+- `/esqueci-a-senha`: solicitação de recuperação de senha
+- `/redefinir-senha`: redefinição de senha via token
+
+### Credenciais iniciais (seed)
+
+Após rodar `bun db:seed` com banco vazio:
+
+- Email: `admin@clinica.com`
+- Senha: use o fluxo "Esqueci a Senha" para definir a primeira senha
 
 ---
 

@@ -43,6 +43,7 @@ model User {
   sessions     Session[]
   accounts     Account[]
   atendimentos Atendimento[]
+  notificacoes Notificacao[]
 
   @@map("user")
 }
@@ -94,6 +95,25 @@ model Verification {
 // ================================================================
 // TABELAS DE NEGÓCIO
 // ================================================================
+
+enum TipoNotificacao {
+  URGENTE
+  NORMAL
+}
+
+model Notificacao {
+  id        String   @id @default(cuid())
+  titulo    String
+  mensagem  String
+  tipo      TipoNotificacao @default(NORMAL)
+  lida      Boolean  @default(false)
+  criadoEm  DateTime @default(now())
+
+  usuarioId String
+  usuario   User     @relation(fields: [usuarioId], references: [id], onDelete: Cascade)
+
+  @@map("notificacao")
+}
 
 model Atendimento {
   id         String   @id @default(cuid())

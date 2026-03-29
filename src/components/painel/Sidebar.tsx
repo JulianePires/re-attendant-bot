@@ -1,25 +1,31 @@
 "use client";
 
+import { APP_ROUTES } from "@/lib/constants";
+import { cn } from "@/lib/utils";
+import { History, LayoutDashboard, Stethoscope, UserCog, Users } from "lucide-react";
 import Link from "next/link";
 import { usePathname } from "next/navigation";
-import { LayoutDashboard, History, Users, Stethoscope } from "lucide-react";
-import { cn } from "@/lib/utils";
 
 const itensNav = [
   {
-    href: "/painel",
+    href: APP_ROUTES.DASHBOARD,
     label: "Dashboard",
     icone: LayoutDashboard,
   },
   {
-    href: "/painel/historico",
+    href: APP_ROUTES.HISTORICO,
     label: "Histórico",
     icone: History,
   },
   {
-    href: "/painel/usuarios",
+    href: APP_ROUTES.USUARIOS,
     label: "Usuários",
     icone: Users,
+  },
+  {
+    href: APP_ROUTES.EQUIPE,
+    label: "Equipe",
+    icone: UserCog,
   },
 ];
 
@@ -27,24 +33,25 @@ export function Sidebar() {
   const pathname = usePathname();
 
   return (
-    <aside className="flex h-screen w-60 shrink-0 flex-col border-r border-slate-200 bg-white">
+    <aside className="border-border bg-background flex h-screen w-64 shrink-0 flex-col border-r">
       {/* Identidade da aplicação */}
-      <div className="flex h-16 items-center gap-2.5 border-b border-slate-200 px-5">
-        <div className="flex h-8 w-8 items-center justify-center rounded-lg bg-blue-600">
-          <Stethoscope className="h-4 w-4 text-white" aria-hidden="true" />
+      <div className="border-border flex h-16 items-center gap-2.5 border-b px-5">
+        <div className="bg-primary flex h-8 w-8 items-center justify-center rounded-lg">
+          <Stethoscope className="text-primary-foreground h-4 w-4" aria-hidden="true" />
         </div>
-        <span className="text-sm font-semibold text-slate-800">Clínica Painel</span>
+        <span className="text-foreground text-sm font-semibold">Clínica Painel</span>
       </div>
 
       {/* Navegação principal */}
       <nav
         className="flex-1 space-y-0.5 overflow-y-auto px-3 py-4"
-        aria-label="Navegação do painel"
+        aria-label="Navegacao do painel"
       >
         {itensNav.map(({ href, label, icone: Icone }) => {
           // Correspondência exata para /painel evita que Dashboard
           // fique ativo em todas as sub-rotas do painel
-          const ativo = href === "/painel" ? pathname === href : pathname.startsWith(href);
+          const ativo =
+            href === APP_ROUTES.DASHBOARD ? pathname === href : pathname.startsWith(href);
 
           return (
             <Link
@@ -52,14 +59,14 @@ export function Sidebar() {
               href={href}
               aria-current={ativo ? "page" : undefined}
               className={cn(
-                "flex items-center gap-3 rounded-lg px-3 py-2.5 text-sm font-medium transition-colors",
+                "flex items-center gap-3 rounded-lg px-3 py-2.5 text-sm font-medium transition-all duration-300 ease-in-out",
                 ativo
-                  ? "bg-blue-50 text-blue-700"
-                  : "text-slate-600 hover:bg-slate-100 hover:text-slate-900"
+                  ? "bg-primary/15 text-primary"
+                  : "text-muted-foreground hover:bg-muted hover:text-foreground"
               )}
             >
               <Icone
-                className={cn("h-4 w-4 shrink-0", ativo ? "text-blue-600" : "text-slate-400")}
+                className={cn("h-4 w-4 shrink-0", ativo ? "text-primary" : "text-muted-foreground")}
                 aria-hidden="true"
               />
               {label}
@@ -69,8 +76,8 @@ export function Sidebar() {
       </nav>
 
       {/* Rodapé da sidebar — versão ou info secundária */}
-      <div className="border-t border-slate-200 px-5 py-3">
-        <p className="text-xs text-slate-400">v0.1.0 — Beta</p>
+      <div className="border-border border-t px-5 py-3">
+        <p className="text-muted-foreground text-xs">v1.0.0 — Beta</p>
       </div>
     </aside>
   );

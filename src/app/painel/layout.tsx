@@ -9,7 +9,7 @@ export const metadata: Metadata = {
 export default function PainelLayout({ children }: { children: React.ReactNode }) {
   return (
     // h-screen + overflow-hidden: garante que apenas o <main> role, não a página inteira
-    <div className="flex h-screen overflow-hidden bg-slate-50">
+    <div className="bg-background text-foreground flex h-screen overflow-hidden">
       <Sidebar />
 
       {/* Coluna direita: Header fixo + área de conteúdo rolável */}
