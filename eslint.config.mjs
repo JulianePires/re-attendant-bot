@@ -10,6 +10,11 @@ const eslintConfig = defineConfig([
   // Deve ser o último item para sobrescrever qualquer regra anterior.
   prettier,
   globalIgnores([".next/**", "out/**", "build/**", "next-env.d.ts", "vitest.config.ts"]),
+  {
+    rules: {
+      "@typescript-eslint/no-explicit-any": "off",
+    },
+  },
 ]);
 
 export default eslintConfig;

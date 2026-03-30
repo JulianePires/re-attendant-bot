@@ -3,7 +3,7 @@ import { useThemeState } from "@/components/providers/theme-provider";
 interface InputProps {
   id: string;
   label: string;
-  register: unknown; // Devido à natureza dinâmica do react-hook-form, usamos `any` aqui.
+  register: (id: string) => any;
   error?: { message: string };
   type?: string;
 }
