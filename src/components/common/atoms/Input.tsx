@@ -1,6 +1,14 @@
 import { useThemeState } from "@/components/providers/theme-provider";
 
-const Input = ({ id, label, register, error, type = "text" }) => {
+interface InputProps {
+  id: string;
+  label: string;
+  register: unknown; // Devido à natureza dinâmica do react-hook-form, usamos `any` aqui.
+  error?: { message: string };
+  type?: string;
+}
+
+const Input = ({ id, label, register, error, type = "text" }: InputProps) => {
   const { theme } = useThemeState();
 
   return (
