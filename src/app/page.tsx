@@ -26,16 +26,16 @@ export default function TabletStandbyPage() {
   return (
     <div className="relative flex min-h-screen w-screen flex-col items-center justify-center overflow-hidden bg-zinc-950 text-zinc-100 select-none">
       {/* Background radial gradient sutil estilo Dark Mode puro */}
-      <div className="absolute inset-0 bg-[radial-gradient(ellipse_at_top,_var(--tw-gradient-stops))] from-violet-900/10 via-zinc-950 to-zinc-950"></div>
+      <div className="absolute inset-0 bg-[radial-gradient(ellipse_at_top,var(--tw-gradient-stops))] from-violet-900/10 via-zinc-950 to-zinc-950"></div>
 
       {/* Luzes decorativas */}
       <div
         aria-hidden="true"
-        className="pointer-events-none absolute -top-40 -left-32 h-[28rem] w-[28rem] rounded-full bg-violet-600/10 blur-3xl"
+        className="pointer-events-none absolute -top-40 -left-32 h-112 w-md rounded-full bg-violet-600/10 blur-3xl"
       />
       <div
         aria-hidden="true"
-        className="pointer-events-none absolute -right-32 -bottom-40 h-[28rem] w-[28rem] rounded-full bg-indigo-600/10 blur-3xl"
+        className="pointer-events-none absolute -right-32 -bottom-40 h-112 w-md rounded-full bg-indigo-600/10 blur-3xl"
       />
 
       {/* Client Components atomicos isolam TTS, animacao e interacao */}

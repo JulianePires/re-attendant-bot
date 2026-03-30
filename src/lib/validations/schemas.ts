@@ -41,13 +41,7 @@ function isValidCPF(cpf: string): boolean {
 }
 
 export const patientQueueSchema = z.object({
-  nome: z.string().min(3, "O nome deve ter pelo menos 3 caracteres."),
-  email: z.string().email("E-mail inválido.").optional().or(z.literal("")),
-  cpf: z
-    .string()
-    .length(11, "O CPF deve conter exatamente 11 dígitos.")
-    .refine((cpf) => /^\d{11}$/.test(cpf), "O CPF deve conter apenas números.")
-    .refine((cpf) => isValidCPF(cpf), "CPF inválido. Verifique os dígitos verificadores."),
+  nome: z.string().trim().min(2, "O nome deve ter pelo menos 2 caracteres."),
 });
 
 export const adminRegistrationSchema = z.object({

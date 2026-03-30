@@ -28,8 +28,8 @@ export default function PainelDashboardPage() {
     queryFn: obterAtendimentosDoDia,
   });
 
-  const totalHoje = atendimentosDia.length;
-  const urgentesHoje = atendimentosDia.filter((a) => a.tipoChamada === "urgente").length;
+  const totalNoTurno = atendimentosDia.length;
+  const urgentesNoTurno = atendimentosDia.filter((a) => a.tipoChamada === "urgente").length;
 
   return (
     <div className="space-y-6">
@@ -44,11 +44,11 @@ export default function PainelDashboardPage() {
       {/* Cards de resumo */}
       <div className="grid grid-cols-3 gap-4">
         <ResumoCard cor="violet" titulo="Na fila" valor={filaAtiva.length} />
-        <ResumoCard cor="emerald" titulo="Atendidos hoje" valor={totalHoje} />
-        <ResumoCard cor="red" titulo="Urgências hoje" valor={urgentesHoje} />
+        <ResumoCard cor="emerald" titulo="Atendidos no turno" valor={totalNoTurno} />
+        <ResumoCard cor="red" titulo="Urgências no turno" valor={urgentesNoTurno} />
       </div>
 
-      {/* Corpo: duas colunas — Fila de espera | Histórico do dia */}
+      {/* Corpo: duas colunas — Fila de espera | Finalizados no turno */}
       <div className="grid grid-cols-1 gap-6 lg:grid-cols-2">
         {/* ── Fila de Espera ── */}
         <ActiveQueue />

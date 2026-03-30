@@ -22,7 +22,7 @@ datasource db {
 model User {
   id            String    @id
   name          String
-  email         String    @unique
+  email         String?   @unique
   emailVerified Boolean
   image         String?
   createdAt     DateTime
@@ -36,7 +36,7 @@ model User {
   banExpires DateTime?
 
   // Campos customizados da clínica
-  cpf          String    @unique
+  cpf          String?   @unique
   ultimoAcesso DateTime?
 
   // Relações
@@ -127,6 +127,7 @@ model Atendimento {
 
   criadoEm    DateTime  @default(now())
   finalizadoEm DateTime?
+  arquivadoTurno Boolean @default(false)
 
   // Índice composto para queries de fila (status + criadoEm é o padrão de ordenação)
   @@index([status, criadoEm])

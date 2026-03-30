@@ -3,29 +3,12 @@
 import { useState, useEffect, useRef } from "react";
 import { motion, AnimatePresence } from "framer-motion";
 import { useTTS } from "@/hooks/useTTS";
-import { buscarPacientePorCPF, registrarEEntrarNaFila } from "@/server/actions/atendimento";
+import { registrarEEntrarNaFila } from "@/server/actions/atendimento";
 import { Loader2, ArrowLeft, HeartPulse, UserCircle } from "lucide-react";
-import { DoctorLoader } from "@/components/common/DoctorLoader";
 import { TipoChamadaValue } from "@/types";
 import { toast } from "sonner";
 
-const formatCPF = (val: string) => {
-  return val
-    .replace(/\D/g, "")
-    .replace(/(\d{3})(\d)/, "$1.$2")
-    .replace(/(\d{3})(\d)/, "$1.$2")
-    .replace(/(\d{3})(\d{1,2})/, "$1-$2")
-    .replace(/(-\d{2})\d+?$/, "$1");
-};
-
-type Step =
-  | "HOME"
-  | "CPF_INPUT"
-  | "CHECKING"
-  | "WELCOME_BACK"
-  | "REGISTER"
-  | "URGENT_FORM"
-  | "SUCCESS";
+type Step = "HOME" | "FORM" | "SUCCESS";
 
 const PageTransition = ({
   children,
@@ -39,7 +22,7 @@ const PageTransition = ({
     animate={{ opacity: 1, scale: 1 }}
     exit={{ opacity: 0, scale: 1.05 }}
     transition={{ duration: 0.4, ease: "easeOut" }}
-    className={`relative mx-auto flex w-full max-w-xl flex-col gap-4 rounded-3xl border border-zinc-800/60 bg-zinc-950/70 p-6 shadow-2xl backdrop-blur-xl ${className}`}
+    className={`relative mx-auto flex w-full max-w-xl flex-col gap-4 rounded-3xl border border-zinc-800/60 bg-zinc-950/70 p-6 ${className}`}
   >
     {children}
   </motion.div>
@@ -47,8 +30,8 @@ const PageTransition = ({
 
 export function KioskInteractionFlow() {
   const [step, setStep] = useState<Step>("HOME");
-  const [cpf, setCpf] = useState("");
   const [nome, setNome] = useState("");
+  const [tipoChamada, setTipoChamada] = useState<TipoChamadaValue>("normal");
   const [isSubmitting, setIsSubmitting] = useState(false);
 
   const { falar, parar } = useTTS();
@@ -57,8 +40,8 @@ export function KioskInteractionFlow() {
   // Zera todo o estado e volta pro inicio
   const resetFlow = () => {
     setStep("HOME");
-    setCpf("");
     setNome("");
+    setTipoChamada("normal");
     setIsSubmitting(false);
     parar();
   };
@@ -79,7 +62,7 @@ export function KioskInteractionFlow() {
       if (timerRef.current) clearTimeout(timerRef.current);
     };
     // eslint-disable-next-line react-hooks/exhaustive-deps
-  }, [step, cpf, nome]);
+  }, [step, nome]);
 
   // TTS Feedback ao entrar em novas telas
   useEffect(() => {
@@ -87,17 +70,8 @@ export function KioskInteractionFlow() {
       case "HOME":
         falar("Bem-vindo. Toque na tela para iniciar seu atendimento.");
         break;
-      case "CPF_INPUT":
-        falar("Por favor, digite seu C P F.");
-        break;
-      case "WELCOME_BACK":
-        falar(`Olá, ${nome}! Que bom ver você de novo. Por favor, confirme sua chegada.`);
-        break;
-      case "REGISTER":
-        falar("Boas-vindas! Parece que é sua primeira vez. Poderia nos dizer seu nome?");
-        break;
-      case "URGENT_FORM":
-        falar("Atendimento Urgente. Por favor, informe seu nome.");
+      case "FORM":
+        falar("Digite seu nome, escolha normal ou urgência e confirme sua entrada na fila.");
         break;
       case "SUCCESS":
         falar("Tudo certo! Aguarde que logo você será chamado.");
@@ -105,39 +79,18 @@ export function KioskInteractionFlow() {
     }
   }, [step, falar, nome]);
 
-  // Trigger automático ao finalizar os 11 dígitos do CPF (com formatação fica 14)
-  useEffect(() => {
-    const checkCpf = async (currentCpf: string) => {
-      if (currentCpf.length === 14 && step === "CPF_INPUT") {
-        setStep("CHECKING");
-        try {
-          const [paciente] = await Promise.all([
-            buscarPacientePorCPF(currentCpf),
-            new Promise((resolve) => setTimeout(resolve, 800)), // Garante tempo para a animação do CHECKING
-          ]);
-
-          if (paciente) {
-            setNome(paciente.name);
-            setStep("WELCOME_BACK");
-          } else {
-            setStep("REGISTER");
-          }
-        } catch {
-          setStep("REGISTER");
-        }
-      }
-    };
-    checkCpf(cpf);
-  }, [cpf, step]);
-
-  const handleAction = async (tipo: "normal" | "urgente") => {
+  const handleAction = async () => {
     if (isSubmitting) return;
+    if (nome.trim().length < 2) {
+      toast.error("Digite seu nome para continuar.");
+      return;
+    }
+
     setIsSubmitting(true);
     try {
       await registrarEEntrarNaFila({
-        nome: nome || "Paciente Não Identificado",
-        cpf: cpf || "00000000000", // CPF provisório se for urgência severa sem docs
-        tipoChamada: tipo as TipoChamadaValue,
+        nome: nome.trim(),
+        tipoChamada,
       });
       toast.success("Entrada na fila registrada com sucesso.");
       setStep("SUCCESS");
@@ -155,7 +108,7 @@ export function KioskInteractionFlow() {
       onClick={resetTimer}
     >
       <AnimatePresence mode="wait">
-        {step !== "HOME" && step !== "SUCCESS" && step !== "CHECKING" && (
+        {step === "FORM" && (
           <motion.button
             initial={{ opacity: 0 }}
             animate={{ opacity: 1 }}
@@ -168,88 +121,87 @@ export function KioskInteractionFlow() {
         )}
 
         {step === "HOME" && (
-          <PageTransition
-            key="home"
-            className="!max-w-3xl border-none bg-transparent py-0 shadow-none"
-          >
-            <h1 className="mb-8 text-center text-3xl font-bold text-zinc-100 drop-shadow-md">
-              Como podemos ajudá-lo hoje?
+          <PageTransition key="home" className="max-w-3xl! border-none bg-transparent py-0">
+            <h1 className="mb-6 text-center text-3xl font-bold text-zinc-100">
+              Check-in da recepção
             </h1>
-            <div className="mx-auto grid max-w-2xl grid-cols-1 gap-4 px-2 sm:grid-cols-2">
+            <p className="mx-auto mb-8 max-w-xl text-center text-zinc-300">
+              Toque para iniciar e entrar na fila em segundos.
+            </p>
+            <div className="mx-auto grid max-w-2xl grid-cols-1 gap-4 px-2">
               <button
-                onClick={() => setStep("CPF_INPUT")}
+                onClick={() => setStep("FORM")}
                 className="group flex flex-col items-center justify-center rounded-3xl border border-zinc-800 bg-zinc-900/60 p-6 backdrop-blur-md transition-all hover:-translate-y-1 hover:border-violet-500/50 hover:bg-zinc-800/80 hover:shadow-[0_0_30px_rgba(124,58,237,0.15)] active:scale-[0.98]"
               >
                 <div className="mb-4 flex h-14 w-14 items-center justify-center rounded-full bg-violet-500/10 transition-colors group-hover:bg-violet-500/20">
                   <UserCircle className="h-7 w-7 text-violet-400 transition-transform group-hover:scale-110 group-hover:text-violet-300" />
                 </div>
-                <span className="text-xl font-semibold text-zinc-100">Entrar na Fila</span>
+                <span className="text-xl font-semibold text-zinc-100">Iniciar Atendimento</span>
                 <span className="mt-2 text-center text-xs font-medium text-zinc-400">
-                  Check-in para consultas e exames
-                </span>
-              </button>
-
-              <button
-                onClick={() => setStep("URGENT_FORM")}
-                className="group flex flex-col items-center justify-center rounded-3xl border border-zinc-800 bg-zinc-900/60 p-6 backdrop-blur-md transition-all hover:-translate-y-1 hover:border-red-500/50 hover:bg-zinc-800/80 hover:shadow-[0_0_30px_rgba(239,68,68,0.15)] active:scale-[0.98]"
-              >
-                <div className="mb-4 flex h-14 w-14 items-center justify-center rounded-full bg-red-500/10 transition-colors group-hover:bg-red-500/20">
-                  <HeartPulse className="h-7 w-7 text-red-400 transition-transform group-hover:scale-110 group-hover:text-red-300" />
-                </div>
-                <span className="text-xl font-semibold text-zinc-100">Ajuda Urgente</span>
-                <span className="mt-2 text-center text-xs font-medium text-zinc-400">
-                  Fisiologia alterada ou risco imediato
+                  Digite seu nome e escolha o tipo de chamada
                 </span>
               </button>
             </div>
           </PageTransition>
         )}
 
-        {step === "CPF_INPUT" && (
-          <PageTransition key="cpf" className="max-w-xl">
+        {step === "FORM" && (
+          <PageTransition key="form" className="max-w-xl">
             <div className="mb-4 text-center">
-              <h2 className="text-2xl font-bold tracking-tight text-white">Identifique-se</h2>
-              <p className="mt-2 text-base text-zinc-400">Por favor, digite seu CPF abaixo</p>
+              <h2 className="text-2xl font-bold tracking-tight text-white">Identificação rápida</h2>
+              <p className="mt-2 text-base text-zinc-400">
+                Informe seu nome e prioridade do atendimento
+              </p>
             </div>
-            <div className="mt-2">
+
+            <div className="space-y-4">
               <input
-                type="tel"
+                type="text"
                 autoFocus
-                value={cpf}
-                onChange={(e) => setCpf(formatCPF(e.target.value))}
-                className="w-full rounded-xl border border-zinc-800 bg-zinc-900 px-4 py-4 text-center font-mono text-3xl tracking-[0.25em] text-zinc-100 transition-all placeholder:text-zinc-700 focus:border-violet-500 focus:shadow-[0_0_20px_rgba(124,58,237,0.2)] focus:outline-none"
-                placeholder="000.000.000-00"
-                maxLength={14}
+                value={nome}
+                onChange={(e) => setNome(e.target.value)}
+                className="w-full rounded-xl border border-zinc-800 bg-zinc-900 px-5 py-5 text-center text-3xl text-zinc-100 transition-all placeholder:text-zinc-700 focus:border-violet-500 focus:shadow-[0_0_20px_rgba(124,58,237,0.2)] focus:outline-none"
+                placeholder="Digite seu nome"
+                autoComplete="off"
               />
-            </div>
-            <div className="mt-1 flex h-6 items-center justify-center">
-              {cpf.length > 0 && cpf.length < 14 && (
-                <p className="text-sm font-medium text-violet-400">Continue digitando...</p>
-              )}
-            </div>
-          </PageTransition>
-        )}
 
-        {step === "CHECKING" && (
-          <PageTransition key="checking" className="border-none bg-transparent shadow-none">
-            <DoctorLoader message="Buscando seu cadastro..." />
-          </PageTransition>
-        )}
+              <div className="grid grid-cols-2 gap-3">
+                <button
+                  type="button"
+                  onClick={() => setTipoChamada("normal")}
+                  className={`rounded-xl border px-4 py-4 text-lg font-semibold transition-all ${
+                    tipoChamada === "normal"
+                      ? "border-violet-500 bg-violet-500/15 text-violet-200"
+                      : "border-zinc-800 bg-zinc-900/70 text-zinc-300 hover:border-zinc-700"
+                  }`}
+                >
+                  <span className="block">Normal</span>
+                  <span className="mt-1 block text-xs font-medium text-zinc-400">
+                    Consulta e exame
+                  </span>
+                </button>
 
-        {step === "WELCOME_BACK" && (
-          <PageTransition key="welcome" className="max-w-xl">
-            <div className="mb-2 text-center">
-              <div className="mx-auto mb-3 flex h-12 w-12 items-center justify-center rounded-full border border-violet-500/20 bg-violet-500/10 text-violet-400">
-                <UserCircle className="h-6 w-6" />
+                <button
+                  type="button"
+                  onClick={() => setTipoChamada("urgente")}
+                  className={`rounded-xl border px-4 py-4 text-lg font-semibold transition-all ${
+                    tipoChamada === "urgente"
+                      ? "border-red-500 bg-red-500/15 text-red-200"
+                      : "border-zinc-800 bg-zinc-900/70 text-zinc-300 hover:border-zinc-700"
+                  }`}
+                >
+                  <span className="flex items-center justify-center gap-2">
+                    <HeartPulse className="h-5 w-5" /> Urgência
+                  </span>
+                  <span className="mt-1 block text-xs font-medium text-zinc-400">
+                    Prioridade imediata
+                  </span>
+                </button>
               </div>
-              <h2 className="text-2xl font-bold tracking-tight text-white">
-                Olá, {nome.split(" ")[0]}!
-              </h2>
-              <p className="mt-1 text-sm text-zinc-400">Que bom ver você de novo por aqui.</p>
             </div>
 
             <button
-              onClick={() => handleAction("normal")}
+              onClick={handleAction}
               disabled={isSubmitting}
               className="mt-4 flex w-full items-center justify-center gap-3 rounded-xl bg-violet-600 py-4 text-lg font-bold text-white shadow-[0_0_20px_rgba(124,58,237,0.3)] transition-all hover:scale-[1.02] hover:bg-violet-500 active:scale-[0.98] disabled:opacity-50 disabled:hover:scale-100"
             >
@@ -258,106 +210,7 @@ export function KioskInteractionFlow() {
                   <Loader2 className="h-5 w-5 animate-spin" /> Adicionando à fila...
                 </span>
               ) : (
-                "CONFIRMAR CHEGADA"
-              )}
-            </button>
-          </PageTransition>
-        )}
-
-        {step === "REGISTER" && (
-          <PageTransition key="register" className="max-w-xl">
-            <h2 className="text-center text-2xl font-bold tracking-tight">
-              Boas-vindas à Clínica!
-            </h2>
-            <p className="mt-1 mb-4 text-center text-sm text-zinc-400">
-              Poderia nos dizer o seu nome?
-            </p>
-
-            <div className="space-y-4">
-              <div>
-                <label className="mb-1 block pl-2 text-sm font-medium text-zinc-400">
-                  Nome Completo
-                </label>
-                <input
-                  type="text"
-                  autoFocus
-                  value={nome}
-                  onChange={(e) => setNome(e.target.value)}
-                  className="w-full rounded-xl border border-zinc-800 bg-zinc-900 px-4 py-3 text-lg text-white transition-all outline-none placeholder:text-zinc-600 focus:border-violet-500 focus:shadow-[0_0_15px_rgba(124,58,237,0.15)]"
-                  placeholder="Toque para digitar"
-                  autoComplete="off"
-                />
-              </div>
-              <div>
-                <label className="mb-1 block pl-2 text-sm font-medium text-zinc-500">
-                  CPF Vinculado
-                </label>
-                <input
-                  type="text"
-                  value={cpf}
-                  disabled
-                  className="w-full cursor-not-allowed rounded-xl border border-zinc-800/50 bg-zinc-900/40 px-4 py-3 font-mono text-lg text-zinc-500 opacity-80"
-                />
-              </div>
-            </div>
-
-            <button
-              onClick={() => handleAction("normal")}
-              disabled={isSubmitting || nome.trim().length < 3}
-              className="mt-6 flex w-full items-center justify-center gap-2 rounded-xl bg-violet-600 py-4 text-lg font-bold text-white shadow-lg transition-all hover:bg-violet-500 hover:shadow-[0_0_20px_rgba(124,58,237,0.3)] disabled:bg-zinc-800 disabled:opacity-50 disabled:shadow-none"
-            >
-              {isSubmitting ? <Loader2 className="h-5 w-5 animate-spin" /> : "PROSSEGUIR"}
-            </button>
-          </PageTransition>
-        )}
-
-        {step === "URGENT_FORM" && (
-          <PageTransition
-            key="urgent"
-            className="relative max-w-xl overflow-hidden !border-red-500/20"
-          >
-            <div className="absolute top-0 left-0 h-1 w-full bg-gradient-to-r from-red-600/0 via-red-500 to-red-600/0 opacity-50"></div>
-            <h2 className="text-center text-2xl font-bold tracking-tight text-red-500">
-              Atendimento Urgente
-            </h2>
-            <p className="mt-1 mb-4 text-center text-sm text-red-200/60">
-              Insira apenas os dados básicos para darmos prioridade.
-            </p>
-
-            <div className="space-y-4">
-              <div>
-                <input
-                  type="text"
-                  autoFocus
-                  value={nome}
-                  onChange={(e) => setNome(e.target.value)}
-                  className="w-full rounded-xl border border-red-500/20 bg-zinc-900 px-4 py-3 text-lg text-white transition-all placeholder:text-zinc-600 focus:border-red-500 focus:shadow-[0_0_15px_rgba(239,68,68,0.2)] focus:outline-none"
-                  placeholder="Nome do Paciente"
-                />
-              </div>
-              <div>
-                <input
-                  type="tel"
-                  value={cpf}
-                  onChange={(e) => setCpf(formatCPF(e.target.value))}
-                  className="w-full rounded-xl border border-red-500/10 bg-zinc-900/60 px-4 py-3 font-mono text-lg tracking-wider text-white transition-all placeholder:text-zinc-700 focus:border-red-500 focus:shadow-[0_0_15px_rgba(239,68,68,0.1)] focus:outline-none"
-                  placeholder="CPF (Opcional)"
-                  maxLength={14}
-                />
-              </div>
-            </div>
-
-            <button
-              onClick={() => handleAction("urgente")}
-              disabled={isSubmitting || nome.trim().length < 2}
-              className="mt-6 flex w-full items-center justify-center gap-3 rounded-xl bg-red-600 bg-gradient-to-r from-red-600 to-red-700 py-4 text-lg font-bold text-white shadow-[0_5px_20px_rgba(239,68,68,0.3)] transition-all hover:scale-[1.02] hover:bg-red-500 hover:shadow-[0_10px_30px_rgba(239,68,68,0.4)] active:scale-[0.98] disabled:opacity-50 disabled:shadow-none"
-            >
-              {isSubmitting ? (
-                <span className="flex items-center gap-2">
-                  <Loader2 className="h-5 w-5 animate-spin" /> Acionando equipe...
-                </span>
-              ) : (
-                <>SOLICITAR AJUDA AGORA</>
+                "CONFIRMAR E ENTRAR NA FILA"
               )}
             </button>
           </PageTransition>

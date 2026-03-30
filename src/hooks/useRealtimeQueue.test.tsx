@@ -1,5 +1,5 @@
 import { render, waitFor } from "@testing-library/react";
-import { QueryClient } from "@tanstack/react-query";
+import { QueryClient, QueryClientProvider } from "@tanstack/react-query";
 import { beforeEach, describe, expect, it, vi } from "vitest";
 import {
   ATENDIMENTOS_DIA_QUERY_KEY,
@@ -39,8 +39,8 @@ vi.mock("@/hooks/useCampainha", () => ({
   useCampainha: () => ({ tocarAlertaUrgente, pararAlertaUrgente, tocarNotificacao }),
 }));
 
-function HookHarness({ client }: { client: QueryClient }) {
-  useRealtimeQueue(client);
+function HookHarness() {
+  useRealtimeQueue();
   return null;
 }
 
@@ -55,7 +55,11 @@ describe("useRealtimeQueue", () => {
     const queryClient = new QueryClient();
     const invalidateSpy = vi.spyOn(queryClient, "invalidateQueries");
 
-    render(<HookHarness client={queryClient} />);
+    render(
+      <QueryClientProvider client={queryClient}>
+        <HookHarness />
+      </QueryClientProvider>
+    );
 
     await waitFor(() => expect(insertHandler).toBeTypeOf("function"));
 
@@ -82,7 +86,11 @@ describe("useRealtimeQueue", () => {
   it("toca alerta urgente em loop ao receber INSERT urgente", async () => {
     const queryClient = new QueryClient();
 
-    render(<HookHarness client={queryClient} />);
+    render(
+      <QueryClientProvider client={queryClient}>
+        <HookHarness />
+      </QueryClientProvider>
+    );
 
     await waitFor(() => expect(insertHandler).toBeTypeOf("function"));
 
@@ -118,7 +126,11 @@ describe("useRealtimeQueue", () => {
       },
     ]);
 
-    render(<HookHarness client={queryClient} />);
+    render(
+      <QueryClientProvider client={queryClient}>
+        <HookHarness />
+      </QueryClientProvider>
+    );
 
     await waitFor(() => expect(updateHandler).toBeTypeOf("function"));
 

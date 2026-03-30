@@ -26,7 +26,7 @@ import { Card, CardContent, CardHeader, CardTitle, CardDescription } from "@/com
 type Profissional = {
   id: string;
   name: string;
-  email: string;
+  email: string | null;
   cpf: string | null;
   role: string | null;
 };
@@ -114,7 +114,7 @@ export const TeamList = ({ usuarioLogadoId }: { usuarioLogadoId: string }) => {
                 <TableHead className="py-4 font-semibold text-zinc-400">Nome</TableHead>
                 <TableHead className="py-4 font-semibold text-zinc-400">E-mail</TableHead>
                 <TableHead className="py-4 font-semibold text-zinc-400">CPF</TableHead>
-                <TableHead className="w-[250px] py-4 font-semibold text-zinc-400">
+                <TableHead className="w-62.5 py-4 font-semibold text-zinc-400">
                   Permissão (Cargo)
                 </TableHead>
               </TableRow>
@@ -129,7 +129,9 @@ export const TeamList = ({ usuarioLogadoId }: { usuarioLogadoId: string }) => {
                     <TableCell className="px-4 py-3 font-medium text-zinc-200">
                       {profissional.name}
                     </TableCell>
-                    <TableCell className="px-4 py-3 text-zinc-400">{profissional.email}</TableCell>
+                    <TableCell className="px-4 py-3 text-zinc-400">
+                      {profissional.email || "-"}
+                    </TableCell>
                     <TableCell className="px-4 py-3 font-mono text-sm text-zinc-400">
                       {profissional.cpf?.replace(/(\d{3})(\d{3})(\d{3})(\d{2})/, "$1.$2.$3-$4") ||
                         "—"}
@@ -158,7 +160,7 @@ export const TeamList = ({ usuarioLogadoId }: { usuarioLogadoId: string }) => {
                           </SelectItem>
                           <SelectItem
                             value="revoked"
-                            className="font-medium text-red-400 hover:!text-red-300"
+                            className="font-medium text-red-400 hover:text-red-300!"
                           >
                             Acesso Revogado
                           </SelectItem>

@@ -22,7 +22,7 @@ type HistoricoItem = {
   finalizadoEm: Date | string | null;
   paciente: {
     name: string;
-    cpf: string;
+    cpf: string | null;
   };
 };
 
@@ -84,7 +84,9 @@ const HistoryTable = () => {
                         {item.paciente.name}
                       </TableCell>
                       <TableCell className="text-zinc-400">
-                        {item.paciente.cpf.replace(/(\d{3})(\d{3})(\d{3})(\d{2})/, "$1.$2.$3-$4")}
+                        {item.paciente.cpf
+                          ? item.paciente.cpf.replace(/(\d{3})(\d{3})(\d{3})(\d{2})/, "$1.$2.$3-$4")
+                          : "-"}
                       </TableCell>
                       <TableCell className="text-zinc-400">
                         {format(new Date(item.criadoEm), "HH:mm")}

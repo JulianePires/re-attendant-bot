@@ -13,13 +13,14 @@ import { APP_ROUTES } from "./lib/constants";
  */
 
 // Rotas protegidas por role RBAC
-const ADMIN_ONLY_ROUTES = [APP_ROUTES.NOVO_USUARIO, APP_ROUTES.EQUIPE];
+const ADMIN_ONLY_ROUTES = [APP_ROUTES.EQUIPE];
 
 // Rotas protegidas (requer autenticação)
 const PROTECTED_ROUTES = [
   APP_ROUTES.DASHBOARD,
   APP_ROUTES.USUARIOS,
   APP_ROUTES.HISTORICO,
+  APP_ROUTES.NOVO_USUARIO,
   APP_ROUTES.CONFIGURACOES,
 ];
 
@@ -30,6 +31,14 @@ const PUBLIC_ONLY_ROUTES = [
   APP_ROUTES.LOGIN,
   APP_ROUTES.TOTEM,
 ];
+
+function matchRoute(pathname: string, route: string) {
+  if (route === "/") {
+    return pathname === "/";
+  }
+
+  return pathname === route || pathname.startsWith(`${route}/`);
+}
 
 export async function proxy(request: NextRequest) {
   const pathname = request.nextUrl.pathname;
@@ -43,7 +52,7 @@ export async function proxy(request: NextRequest) {
   const userRole = session?.user?.role;
 
   // Rotas de ADMIN ONLY
-  if (ADMIN_ONLY_ROUTES.some((route) => pathname.startsWith(route))) {
+  if (ADMIN_ONLY_ROUTES.some((route) => matchRoute(pathname, route))) {
     if (!isAuthenticated) {
       // Redireciona para login se não autenticado
       return NextResponse.redirect(new URL(APP_ROUTES.LOGIN, request.url));
@@ -56,7 +65,7 @@ export async function proxy(request: NextRequest) {
   }
 
   // Rotas PROTECTED (requer autenticação)
-  if (PROTECTED_ROUTES.some((route) => pathname.startsWith(route))) {
+  if (PROTECTED_ROUTES.some((route) => matchRoute(pathname, route))) {
     // Exceção: login é público mesmo dentro de /painel
     if (pathname === APP_ROUTES.LOGIN) {
       if (isAuthenticated) {
@@ -73,7 +82,7 @@ export async function proxy(request: NextRequest) {
   }
 
   // Rotas PUBLIC ONLY (redireciona autenticados)
-  if (PUBLIC_ONLY_ROUTES.some((route) => pathname.startsWith(route))) {
+  if (PUBLIC_ONLY_ROUTES.some((route) => matchRoute(pathname, route))) {
     if (isAuthenticated) {
       // Se já autenticado, redireciona para dashboard
       return NextResponse.redirect(new URL(APP_ROUTES.DASHBOARD, request.url));

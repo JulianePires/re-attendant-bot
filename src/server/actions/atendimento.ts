@@ -1,6 +1,7 @@
 "use server";
 
 import { prisma } from "@/lib/prisma";
+import { obterTurnoAtual } from "@/lib/utils/turnos";
 import { patientQueueSchema } from "@/lib/validations/schemas";
 import { StatusAtendimento, TipoChamada, TipoChamadaValue } from "@/types";
 import { z } from "zod";
@@ -174,20 +175,17 @@ export async function obterFilaAtiva() {
 
 export async function obterAtendimentosDoDia() {
   try {
-    const inicioDoDia = new Date();
-    inicioDoDia.setHours(0, 0, 0, 0);
-
-    const fimDoDia = new Date();
-    fimDoDia.setHours(23, 59, 59, 999);
+    const turnoAtual = obterTurnoAtual(new Date());
 
     const atendimentos = await prisma.atendimento.findMany({
       where: {
         status: StatusAtendimento.FINALIZADO,
+        arquivadoTurno: false,
         finalizadoEm: {
-          gte: inicioDoDia,
-          lte: fimDoDia,
+          gte: turnoAtual.inicio,
+          lte: turnoAtual.fim,
         },
-      },
+      } as any,
       orderBy: { finalizadoEm: "desc" },
       include: {
         paciente: {
@@ -210,24 +208,16 @@ export async function entrarNaFilaComValidacao(dados: z.infer<typeof patientQueu
   try {
     const dadosValidados = patientQueueSchema.parse(dados);
 
-    let paciente = await prisma.user.findUnique({
-      where: { cpf: dadosValidados.cpf },
+    const paciente = await prisma.user.create({
+      data: {
+        id: crypto.randomUUID(),
+        name: dadosValidados.nome,
+        emailVerified: false,
+        role: "paciente",
+        createdAt: new Date(),
+        updatedAt: new Date(),
+      } as any,
     });
-
-    if (!paciente) {
-      paciente = await prisma.user.create({
-        data: {
-          id: crypto.randomUUID(),
-          name: dadosValidados.nome, // Map `nome` to `name`
-          cpf: dadosValidados.cpf,
-          email: `${dadosValidados.cpf}@paciente.local`, // Adjusted placeholder email
-          emailVerified: false,
-          role: "paciente",
-          createdAt: new Date(),
-          updatedAt: new Date(),
-        },
-      });
-    }
 
     return await prisma.atendimento.create({
       data: {
@@ -242,57 +232,23 @@ export async function entrarNaFilaComValidacao(dados: z.infer<typeof patientQueu
   }
 }
 
-export async function buscarPacientePorCPF(cpf: string) {
-  try {
-    const paciente = await prisma.user.findUnique({
-      where: { cpf: cpf.replace(/\D/g, "") },
-      select: { id: true, name: true, cpf: true },
-    });
-    return paciente;
-  } catch (error) {
-    console.error("[buscarPacientePorCPF]", error);
-    return null;
-  }
-}
-
 export async function registrarEEntrarNaFila(dados: {
   nome: string;
-  cpf: string;
-  email?: string;
   tipoChamada: TipoChamadaValue;
 }) {
   try {
-    const cpfLimpo = dados.cpf.replace(/\D/g, "");
-    let paciente = await prisma.user.findUnique({
-      where: { cpf: cpfLimpo },
+    const nome = dados.nome.trim();
+
+    const paciente = await prisma.user.create({
+      data: {
+        id: crypto.randomUUID(),
+        name: nome,
+        emailVerified: false,
+        role: "paciente",
+        createdAt: new Date(),
+        updatedAt: new Date(),
+      } as any,
     });
-
-    if (!paciente) {
-      // Se email for fornecido, usa; senão cria um placeholder
-      const email = dados.email?.trim() || `${cpfLimpo}@paciente.local`;
-
-      paciente = await prisma.user.create({
-        data: {
-          id: crypto.randomUUID(),
-          name: dados.nome,
-          cpf: cpfLimpo,
-          email: email,
-          emailVerified: !!dados.email, // Marcar como verificado apenas se o usuário forneceu
-          role: "paciente",
-          createdAt: new Date(),
-          updatedAt: new Date(),
-        },
-      });
-    } else if (dados.email && !paciente.email?.includes("@paciente.local")) {
-      // Se paciente existe e forneceu email válido, atualizar se não tiver email real
-      await prisma.user.update({
-        where: { cpf: cpfLimpo },
-        data: {
-          email: dados.email,
-          emailVerified: true,
-        },
-      });
-    }
 
     const atendimento = await prisma.atendimento.create({
       data: {
@@ -311,6 +267,34 @@ export async function registrarEEntrarNaFila(dados: {
   } catch (error) {
     console.error("[registrarEEntrarNaFila]", error);
     throw new Error("Não foi possível registrar o atendimento.");
+  }
+}
+
+export async function arquivarAtendimentosDoTurno() {
+  try {
+    const turnoAtual = obterTurnoAtual(new Date());
+
+    const resultado = await prisma.atendimento.updateMany({
+      where: {
+        status: StatusAtendimento.FINALIZADO,
+        arquivadoTurno: false,
+        finalizadoEm: {
+          gte: turnoAtual.inicio,
+          lte: turnoAtual.fim,
+        },
+      } as any,
+      data: {
+        arquivadoTurno: true,
+      } as any,
+    });
+
+    return {
+      totalArquivados: resultado.count,
+      turno: turnoAtual,
+    };
+  } catch (error) {
+    console.error("[arquivarAtendimentosDoTurno]", error);
+    throw new Error("Não foi possível limpar os atendimentos do turno.");
   }
 }
 

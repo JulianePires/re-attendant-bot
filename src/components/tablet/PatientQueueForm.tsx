@@ -3,7 +3,7 @@
 import { useForm } from "react-hook-form";
 import { zodResolver } from "@hookform/resolvers/zod";
 import { toast } from "sonner";
-import { Loader2, UserRound, FileText, Mail } from "lucide-react";
+import { Loader2, UserRound } from "lucide-react";
 import { registrarEEntrarNaFila } from "@/server/actions/atendimento";
 import { patientQueueSchema } from "@/lib/validations/schemas";
 import type { Atendimento } from "@prisma/client";
@@ -29,19 +29,13 @@ export default function PatientQueueForm({
     resolver: zodResolver(patientQueueSchema),
     defaultValues: {
       nome: "",
-      cpf: "",
-      email: "",
     },
   });
 
   async function onSubmit(values: FormData) {
     try {
-      // Registra o paciente na fila com validação CPF completa
-      // O email é armazenado para futuras comunicações
       const resultado = await registrarEEntrarNaFila({
         nome: values.nome || "Não informado",
-        cpf: values.cpf,
-        email: values.email,
         tipoChamada,
       });
 
@@ -55,28 +49,8 @@ export default function PatientQueueForm({
   return (
     <form onSubmit={handleSubmit(onSubmit)} className="w-full space-y-6 text-left">
       <Field>
-        <FieldLabel htmlFor="cpf" className="text-zinc-400">
-          CPF (Somente Números)
-        </FieldLabel>
-        <InputGroup>
-          <InputGroupAddon>
-            <FileText className="size-5 text-zinc-500" />
-          </InputGroupAddon>
-          <InputGroupInput
-            id="cpf"
-            placeholder="00011122233"
-            type="tel"
-            maxLength={11}
-            className="h-14 border-zinc-700/50 bg-zinc-900 py-6 text-lg shadow-inner"
-            {...register("cpf")}
-          />
-        </InputGroup>
-        {errors.cpf && <FieldError>{errors.cpf.message}</FieldError>}
-      </Field>
-
-      <Field>
         <FieldLabel htmlFor="nome" className="text-zinc-400">
-          Nome Completo (Opcional)
+          Nome Completo
         </FieldLabel>
         <InputGroup>
           <InputGroupAddon>
@@ -90,25 +64,6 @@ export default function PatientQueueForm({
           />
         </InputGroup>
         {errors.nome && <FieldError>{errors.nome.message}</FieldError>}
-      </Field>
-
-      <Field>
-        <FieldLabel htmlFor="email" className="text-zinc-400">
-          Email (Opcional)
-        </FieldLabel>
-        <InputGroup>
-          <InputGroupAddon>
-            <Mail className="size-5 text-zinc-500" />
-          </InputGroupAddon>
-          <InputGroupInput
-            id="email"
-            placeholder="paciente@email.com"
-            type="email"
-            className="h-14 border-zinc-700/50 bg-zinc-900 py-6 text-lg shadow-inner"
-            {...register("email")}
-          />
-        </InputGroup>
-        {errors.email && <FieldError>{errors.email.message}</FieldError>}
       </Field>
 
       <Button
