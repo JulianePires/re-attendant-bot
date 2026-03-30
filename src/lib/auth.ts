@@ -19,7 +19,11 @@ export const auth = betterAuth({
   database: prismaAdapter(prisma, {
     provider: "postgresql",
   }),
-  trustedOrigins: ["http://localhost:3000", "https://re-attendant-bot.vercel.app/"],
+  trustedOrigins: [
+    "http://localhost:3000",
+    "https://re-attendant-bot.vercel.app",
+    "re-attendant-bot.vercel.app",
+  ],
 
   // Autenticação por e-mail e senha como método primário do sistema.
   // Social providers (Google, etc.) podem ser adicionados aqui no futuro.
