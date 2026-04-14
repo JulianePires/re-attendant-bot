@@ -7,7 +7,7 @@ import * as z from "zod";
 import { useRouter } from "next/navigation";
 import { authClient } from "@/lib/auth-client";
 import { toast } from "sonner";
-import { Loader2, Lock, Mail } from "lucide-react";
+import { Loader2, Lock, Mail, Eye, EyeOff } from "lucide-react";
 import { Card, CardContent, CardDescription, CardHeader, CardTitle } from "@/components/ui/card";
 import { Button } from "@/components/ui/button";
 import { Field, FieldLabel, FieldError } from "@/components/ui/field";
@@ -24,6 +24,7 @@ type LoginFormValues = z.infer<typeof loginSchema>;
 export default function LoginPage() {
   const router = useRouter();
   const [isLoading, setIsLoading] = useState(false);
+  const [showPassword, setShowPassword] = useState(false);
 
   const {
     register,
@@ -60,12 +61,7 @@ export default function LoginPage() {
   }
 
   return (
-    <div className="relative flex min-h-screen w-full items-center justify-center overflow-hidden bg-zinc-950 p-4 text-zinc-100">
-      {/* Decorações visuais ao fundo */}
-      <div className="pointer-events-none absolute inset-0 bg-[radial-gradient(ellipse_at_center,var(--tw-gradient-stops))] from-violet-900/10 via-zinc-950 to-zinc-950"></div>
-      <div className="pointer-events-none absolute -top-[20%] -left-[10%] h-[50%] w-[50%] rounded-full bg-violet-600/10 blur-[120px]"></div>
-      <div className="pointer-events-none absolute -right-[10%] -bottom-[20%] h-[50%] w-[50%] rounded-full bg-indigo-600/10 blur-[120px]"></div>
-
+    <div className="relative flex min-h-screen w-full items-center justify-center overflow-hidden bg-transparent p-4 text-zinc-100">
       <Card className="relative z-10 w-full max-w-md animate-in rounded-3xl border-zinc-800/60 bg-zinc-900/60 shadow-2xl backdrop-blur-xl duration-500 zoom-in-95 fade-in">
         <CardHeader className="pt-8 pb-8 text-center">
           <div className="mx-auto mb-4 flex h-16 w-16 items-center justify-center rounded-2xl border border-violet-500/20 bg-violet-500/10 shadow-[0_0_20px_rgba(124,58,237,0.1)]">
@@ -113,10 +109,19 @@ export default function LoginPage() {
                 </InputGroupAddon>
                 <InputGroupInput
                   id="password"
-                  type="password"
+                  type={showPassword ? "text" : "password"}
                   placeholder="••••••••"
                   {...register("password")}
                 />
+                <InputGroupAddon align="inline-end">
+                  <button
+                    type="button"
+                    onClick={() => setShowPassword(!showPassword)}
+                    className="text-zinc-500 transition-colors hover:text-zinc-300"
+                  >
+                    {showPassword ? <EyeOff className="size-5" /> : <Eye className="size-5" />}
+                  </button>
+                </InputGroupAddon>
               </InputGroup>
               {errors.password && <FieldError>{errors.password.message}</FieldError>}
             </Field>

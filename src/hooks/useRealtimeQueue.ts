@@ -11,22 +11,22 @@ import { supabase } from "@/lib/supabase-client";
 import { useQueryClient } from "@tanstack/react-query";
 import { useEffect } from "react";
 
+/**
+ * ATUALIZADO: Removido pacienteId, agora usa nomePaciente direto
+ * Reflete a refatoração do schema onde Atendimento não tem mais FK para User
+ */
 type RealtimeAtendimento = {
   id: string;
-  pacienteId: string;
+  nomePaciente: string;
   tipoChamada: string;
   status?: string;
   criadoEm: string;
   finalizadoEm?: string | null;
-  paciente: {
-    id: string;
-    name: string;
-  };
 };
 
 type RealtimePayload = {
   id: string;
-  pacienteId: string;
+  nomePaciente: string;
   tipoChamada: string;
   status?: string;
   criadoEm: string;
@@ -64,12 +64,12 @@ export function useRealtimeQueue() {
     };
 
     const upsertAtendimentoNaFila = (novo: Partial<RealtimePayload>) => {
-      if (!novo.id || !novo.pacienteId) {
+      if (!novo.id) {
+        console.warn("⚠️ Payload sem ID, ignorando atualização:", novo);
         return;
       }
 
       const atendimentoId = novo.id;
-      const pacienteId = novo.pacienteId;
 
       queryClient.setQueryData<RealtimeAtendimento[]>(FILA_ATIVA_QUERY_KEY, (oldData = []) => {
         if (!Array.isArray(oldData)) {
@@ -86,19 +86,19 @@ export function useRealtimeQueue() {
 
         const atendimentoOtimista: RealtimeAtendimento = {
           id: atendimentoId,
-          pacienteId,
+          nomePaciente: novo.nomePaciente || "Sincronizando...",
           tipoChamada: normalizarTipoChamada(novo.tipoChamada),
           status,
           criadoEm: novo.criadoEm ?? new Date().toISOString(),
           finalizadoEm: novo.finalizadoEm ?? null,
-          paciente: {
-            id: pacienteId,
-            name: "Sincronizando dados...",
-          },
         };
 
         return ordenarFila([atendimentoOtimista, ...semItem]);
       });
+
+      // REMOVIDO: invalidateQueries com refetchType: 'active'
+      // A atualização otimista via setQueryData já atualiza a UI
+      // Refetch completo só é necessário em casos específicos
     };
 
     const removerAtendimentoDaFila = (atendimentoId?: string) => {
@@ -115,9 +115,12 @@ export function useRealtimeQueue() {
       });
     };
 
-    const sincronizarQueries = () => {
-      queryClient.invalidateQueries({ queryKey: FILA_ATIVA_QUERY_KEY });
-      queryClient.invalidateQueries({ queryKey: ATENDIMENTOS_DIA_QUERY_KEY });
+    // OTIMIZADO: Sincronização leve - apenas ATENDIMENTOS_DIA_QUERY_KEY quando necessário
+    const sincronizarHistorico = () => {
+      queryClient.invalidateQueries({
+        queryKey: ATENDIMENTOS_DIA_QUERY_KEY,
+        refetchType: "none", // Não força refetch imediato
+      });
     };
 
     const channel = supabase
@@ -130,14 +133,16 @@ export function useRealtimeQueue() {
           table: "atendimento",
         },
         (payload) => {
+          console.info("🆕 INSERT recebido do Supabase Realtime:", payload.new);
           const novoAtendimento = payload.new as Partial<RealtimePayload>;
-          if (!novoAtendimento?.id || !novoAtendimento?.pacienteId) {
-            console.warn("⚠️ Payload INSERT inválido no Realtime:", payload);
+
+          if (!novoAtendimento?.id) {
+            console.warn("⚠️ Payload INSERT inválido (sem ID):", payload);
             return;
           }
 
           upsertAtendimentoNaFila(novoAtendimento);
-          sincronizarQueries();
+          // Não precisa invalidar - setQueryData já atualizou a UI
         }
       )
       .on(
@@ -148,14 +153,19 @@ export function useRealtimeQueue() {
           table: "atendimento",
         },
         (payload) => {
+          console.info("🔄 UPDATE recebido do Supabase Realtime:", payload.new);
           const atendimentoAtualizado = payload.new as Partial<RealtimePayload>;
+
           if (!atendimentoAtualizado?.id) {
-            console.warn("⚠️ Payload UPDATE inválido no Realtime:", payload);
+            console.warn("⚠️ Payload UPDATE inválido (sem ID):", payload);
             return;
           }
 
           upsertAtendimentoNaFila(atendimentoAtualizado);
-          sincronizarQueries();
+          // Atualiza histórico apenas quando atendimento é finalizado
+          if (atendimentoAtualizado.status !== "aguardando") {
+            sincronizarHistorico();
+          }
         }
       )
       .on(
@@ -166,22 +176,35 @@ export function useRealtimeQueue() {
           table: "atendimento",
         },
         (payload) => {
+          console.info("🗑️ DELETE recebido do Supabase Realtime:", payload.old);
           const removido = payload.old as Partial<RealtimePayload>;
           removerAtendimentoDaFila(removido?.id);
-          sincronizarQueries();
+          sincronizarHistorico();
         }
       )
       .subscribe((status) => {
         if (status === "SUBSCRIBED") {
-          // Garante hidratação inicial do painel sem depender de refresh manual.
-          sincronizarQueries();
-          console.info("🔔 Sincronização realtime da fila ativada");
+          console.info("✅ Canal Supabase SUBSCRIBED");
+          // REMOVIDO: sincronizarQueries() inicial
+          // A query inicial já é feita pelo useQuery no componente
+        } else if (status === "CHANNEL_ERROR") {
+          console.error("❌ Erro no canal Supabase Realtime");
+        } else if (status === "TIMED_OUT") {
+          console.error("⏰ Timeout na conexão Supabase Realtime");
         }
       });
 
+    // CRÍTICO: Cleanup correto para evitar vazamento de memória
+    // O canal é removido quando o componente desmonta, mas mantém conexão ativa durante ciclo de vida
     return () => {
-      supabase.removeChannel(channel);
-      console.info("🔕 Sincronização realtime da fila removida");
+      supabase
+        .removeChannel(channel)
+        .then(() => {
+          console.info("🔕 Canal Supabase removido com sucesso");
+        })
+        .catch((error) => {
+          console.error("❌ Erro ao remover canal:", error);
+        });
     };
   }, [queryClient]);
 }

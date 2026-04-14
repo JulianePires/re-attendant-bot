@@ -4,12 +4,18 @@ import { prisma } from "@/lib/prisma";
 import { StatusAtendimento } from "@/types";
 import { startOfDay, endOfDay } from "date-fns";
 
+/**
+ * Busca atendimentos finalizados em uma data específica
+ *
+ * ATUALIZADO: Removido include do paciente (não existe mais a FK)
+ * Agora usa nomePaciente diretamente do modelo Atendimento
+ */
 export async function obterHistoricoDoDia(data: string) {
   try {
     // Para evitar conflitos de fuso horário, utilizamos date-fns focando no dia exato
-    const dataAlvo = new Date(data); // garantimos que seja no meio do dia para não ser jogado ao dia anterior pelo GMT
+    const dataAlvo = new Date(data);
     const dataInicial = startOfDay(dataAlvo); // início do dia (00:00:00)
-    const dataFinal = endOfDay(dataAlvo);
+    const dataFinal = endOfDay(dataAlvo); // fim do dia (23:59:59)
 
     const atendimentos = await prisma.atendimento.findMany({
       where: {
@@ -22,14 +28,13 @@ export async function obterHistoricoDoDia(data: string) {
       orderBy: {
         finalizadoEm: "desc",
       },
-      include: {
-        paciente: {
-          select: {
-            id: true,
-            name: true,
-            cpf: true,
-          },
-        },
+      select: {
+        id: true,
+        nomePaciente: true,
+        criadoEm: true,
+        finalizadoEm: true,
+        tipoChamada: true,
+        status: true,
       },
     });
 

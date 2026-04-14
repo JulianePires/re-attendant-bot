@@ -2,7 +2,14 @@
 
 import { prisma } from "@/lib/prisma";
 import { revalidatePath } from "next/cache";
-import { getSession } from "@/lib/auth-client";
+import { headers } from "next/headers";
+import { auth } from "@/lib/auth";
+
+/**
+ * Server Actions para Notificações
+ *
+ * CORRIGIDO: Usa auth.api.getSession() ao invés de getSession() do cliente
+ */
 
 type NotificacaoItem = {
   id: string;
@@ -30,14 +37,17 @@ type PrismaWithNotificacao = typeof prisma & {
 const prismaWithNotificacao = prisma as PrismaWithNotificacao;
 
 export async function obterNotificacoes() {
-  const session = await getSession();
-  if (!session?.data?.user?.id) {
+  const session = await auth.api.getSession({
+    headers: await headers(),
+  });
+
+  if (!session?.user?.id) {
     throw new Error("Usuário não autenticado.");
   }
 
   return prismaWithNotificacao.notificacao.findMany({
     where: {
-      usuarioId: session.data.user.id,
+      usuarioId: session.user.id,
     },
     orderBy: {
       criadoEm: "desc",
@@ -46,15 +56,18 @@ export async function obterNotificacoes() {
 }
 
 export async function marcarComoLida(id: string) {
-  const session = await getSession();
-  if (!session?.data?.user?.id) {
+  const session = await auth.api.getSession({
+    headers: await headers(),
+  });
+
+  if (!session?.user?.id) {
     throw new Error("Usuário não autenticado.");
   }
 
   const resultado = await prismaWithNotificacao.notificacao.updateMany({
     where: {
       id,
-      usuarioId: session.data.user.id,
+      usuarioId: session.user.id,
       lida: false,
     },
     data: {
@@ -72,14 +85,17 @@ export async function marcarComoLida(id: string) {
 }
 
 export async function marcarTodasComoLidas() {
-  const session = await getSession();
-  if (!session?.data?.user?.id) {
+  const session = await auth.api.getSession({
+    headers: await headers(),
+  });
+
+  if (!session?.user?.id) {
     throw new Error("Usuário não autenticado.");
   }
 
   const resultado = await prismaWithNotificacao.notificacao.updateMany({
     where: {
-      usuarioId: session.data.user.id,
+      usuarioId: session.user.id,
       lida: false,
     },
     data: {

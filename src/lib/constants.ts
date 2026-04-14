@@ -7,6 +7,8 @@ const APP_ROUTES: Record<string, string> = {
   EQUIPE: "/painel/equipe",
   CONFIGURACOES: "/painel/configuracoes",
   TOTEM: "/",
+  TV: "/tv",
+  PUBLICO_ATENDIMENTOS: "/publico/atendimentos",
   ESQUECI_SENHA: "/esqueci-a-senha",
   REDEFINIR_SENHA: "/redefinir-senha",
 };

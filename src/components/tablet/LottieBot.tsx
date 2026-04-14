@@ -16,8 +16,8 @@ export function LottieBot({ className, isTalking = false }: LottieBotProps) {
       className={cn("flex flex-col items-center justify-between", className)}
     >
       <span className="flex items-baseline justify-between">
-        <LottieHandler animationName="green-eye" loop className="h-full w-60" aria-hidden="true" />
-        <LottieHandler animationName="green-eye" loop className="h-full w-60" aria-hidden="true" />
+        <LottieHandler animationName="eyes" loop className="h-full w-60" aria-hidden="true" />
+        <LottieHandler animationName="eyes" loop className="h-full w-60" aria-hidden="true" />
       </span>
 
       <LottieHandler

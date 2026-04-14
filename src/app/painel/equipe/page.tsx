@@ -1,19 +1,32 @@
 import { redirect } from "next/navigation";
+import { headers } from "next/headers";
 import { TeamList } from "@/components/dashboard/organisms/TeamList";
 import { RestrictedArea } from "@/components/painel/RestrictedArea";
 import { APP_ROUTES } from "@/lib/constants";
-import { getSession } from "@/lib/auth-client";
+import { auth } from "@/lib/auth";
 
+/**
+ * Página de Gerenciamento de Equipe
+ *
+ * CORRIGIDO: Usa auth.api.getSession() do servidor com headers() correto
+ * Comparação case-insensitive para role
+ */
 export default async function EquipePage() {
-  const session = await getSession();
+  // Obter sessão do servidor usando BetterAuth corretamente
+  const session = await auth.api.getSession({
+    headers: await headers(),
+  });
 
-  if (!session) {
+  // Se não há sessão, redireciona para login
+  if (!session?.user) {
     redirect(APP_ROUTES.LOGIN);
   }
 
-  // Dupla checagem de segurança no nível da página.
-  // O layout já faz uma verificação, mas isso garante a proteção caso o layout mude.
-  if (session.data?.user.role !== "admin") {
+  // Normaliza role para comparação case-insensitive
+  const userRole = (session.user.role || "").toLowerCase();
+
+  // Verifica se o usuário tem permissão de admin
+  if (userRole !== "admin") {
     return <RestrictedArea />;
   }
 
@@ -26,7 +39,7 @@ export default async function EquipePage() {
         </p>
       </div>
 
-      <TeamList usuarioLogadoId={session.data?.user.id} />
+      <TeamList usuarioLogadoId={session.user.id} />
     </div>
   );
 }

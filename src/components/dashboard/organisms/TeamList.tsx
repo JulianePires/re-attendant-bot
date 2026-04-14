@@ -22,6 +22,7 @@ import {
   SelectValue,
 } from "@/components/ui/select";
 import { Card, CardContent, CardHeader, CardTitle, CardDescription } from "@/components/ui/card";
+import { EditUserDialog } from "@/components/painel/EditUserDialog";
 
 type Profissional = {
   id: string;
@@ -42,6 +43,8 @@ export const TeamList = ({ usuarioLogadoId }: { usuarioLogadoId: string }) => {
   } = useQuery<Profissional[]>({
     queryKey: ["profissionais"],
     queryFn: listarProfissionais,
+    staleTime: 30000, // 30s - dados de equipe mudam menos frequentemente
+    refetchOnWindowFocus: true,
   });
 
   const alterarPermissaoMutation = useMutation({
@@ -117,6 +120,7 @@ export const TeamList = ({ usuarioLogadoId }: { usuarioLogadoId: string }) => {
                 <TableHead className="w-62.5 py-4 font-semibold text-zinc-400">
                   Permissão (Cargo)
                 </TableHead>
+                <TableHead className="w-32 py-4 font-semibold text-zinc-400">Ações</TableHead>
               </TableRow>
             </TableHeader>
             <TableBody>
@@ -153,7 +157,7 @@ export const TeamList = ({ usuarioLogadoId }: { usuarioLogadoId: string }) => {
                         <SelectTrigger className="h-9 w-full border-zinc-800 bg-zinc-900 text-sm data-[state=open]:border-violet-500">
                           <SelectValue />
                         </SelectTrigger>
-                        <SelectContent className="border-zinc-800 bg-zinc-900 text-zinc-200">
+                        <SelectContent className="z-[999] border-zinc-800 bg-zinc-900 text-zinc-200">
                           <SelectItem value="profissional">Profissional / Equipe</SelectItem>
                           <SelectItem value="admin" className="font-medium text-violet-400">
                             Administrador
@@ -167,12 +171,18 @@ export const TeamList = ({ usuarioLogadoId }: { usuarioLogadoId: string }) => {
                         </SelectContent>
                       </Select>
                     </TableCell>
+                    <TableCell className="px-4 py-3">
+                      <EditUserDialog
+                        user={profissional}
+                        isCurrentUser={profissional.id === usuarioLogadoId}
+                      />
+                    </TableCell>
                   </TableRow>
                 ))
               ) : (
                 <TableRow>
                   <TableCell
-                    colSpan={4}
+                    colSpan={5}
                     className="h-32 border-zinc-800 text-center text-zinc-500 hover:bg-transparent"
                   >
                     Nenhum colaborador encontrado.

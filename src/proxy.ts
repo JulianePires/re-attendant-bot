@@ -32,6 +32,9 @@ const PUBLIC_ONLY_ROUTES = [
   APP_ROUTES.TOTEM,
 ];
 
+// Rotas totalmente públicas (sem redirecionamento mesmo autenticado)
+const FULLY_PUBLIC_ROUTES = [APP_ROUTES.TV, APP_ROUTES.PUBLICO_ATENDIMENTOS];
+
 function matchRoute(pathname: string, route: string) {
   if (route === "/") {
     return pathname === "/";
@@ -42,6 +45,11 @@ function matchRoute(pathname: string, route: string) {
 
 export async function proxy(request: NextRequest) {
   const pathname = request.nextUrl.pathname;
+
+  // Rotas totalmente públicas (sem verificação de sessão)
+  if (FULLY_PUBLIC_ROUTES.some((route) => matchRoute(pathname, route))) {
+    return NextResponse.next();
+  }
 
   // Validar sessão via auth
   const session = await auth.api.getSession({

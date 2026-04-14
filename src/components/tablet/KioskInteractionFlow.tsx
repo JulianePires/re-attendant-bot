@@ -70,7 +70,7 @@ export function KioskInteractionFlow({ handleToggleTalking }: KioskInteractionFl
     switch (step) {
       case "HOME":
         falar(
-          "Bem-vindo. Escolha entre entrar na fila de atendimento ou falar com um profissional.",
+          "Olá! Bem-vindo. Escolha entre entrar na fila de atendimento ou solicitar a presença de um profissional.",
           onStart,
           onEnd
         );
@@ -112,7 +112,10 @@ export function KioskInteractionFlow({ handleToggleTalking }: KioskInteractionFl
     "flex w-64 h-20 flex-col items-center justify-center gap-1 rounded-2xl px-6 py-5 text-lg font-semibold backdrop-blur-sm transition-all active:scale-95";
 
   return (
-    <div className="flex h-full w-full flex-col text-zinc-100 select-none" onClick={resetTimer}>
+    <div
+      className="pointer-events-none absolute inset-0 z-10 flex h-full w-full flex-col text-zinc-100 select-none"
+      onClick={resetTimer}
+    >
       <AnimatePresence mode="wait">
         {step === "IDLE" && (
           <motion.div
@@ -121,7 +124,7 @@ export function KioskInteractionFlow({ handleToggleTalking }: KioskInteractionFl
             animate={{ opacity: 1, scale: 1 }}
             exit={{ opacity: 0, scale: 1.05 }}
             transition={{ duration: 0.4, ease: "easeOut" }}
-            className="mt-auto flex w-full justify-center px-6 pb-12"
+            className="pointer-events-auto mt-auto flex w-full justify-start px-6 pb-12"
           >
             <button
               type="button"
@@ -141,15 +144,15 @@ export function KioskInteractionFlow({ handleToggleTalking }: KioskInteractionFl
             animate={{ opacity: 1, y: 0 }}
             exit={{ opacity: 0, y: -10 }}
             transition={{ duration: 0.35, ease: "easeOut" }}
-            className="mt-auto flex w-full justify-center gap-4 px-6 pb-10"
+            className="pointer-events-auto mt-auto flex w-full justify-between gap-4 px-6 pb-10"
           >
             <button
               type="button"
               onClick={() => handleChooseOption("normal")}
               className={`${BTN_BASE} border border-violet-500/40 bg-violet-500/10 text-violet-200 hover:bg-violet-500/20`}
             >
-              Normal
-              <span className="text-[16px] font-medium text-zinc-400">Entrar na fila</span>
+              Entrar na fila
+              <span className="text-[16px] font-medium text-zinc-400">Aguardar atendimento</span>
             </button>
 
             <button
@@ -158,7 +161,7 @@ export function KioskInteractionFlow({ handleToggleTalking }: KioskInteractionFl
               className={`${BTN_BASE} border border-red-500/40 bg-red-500/10 text-red-200 hover:bg-red-500/20`}
             >
               <span className="flex items-center gap-1.5">
-                <HeartPulse className="h-4 w-4" /> Urgência
+                <HeartPulse className="h-4 w-4" /> Urgente
               </span>
               <span className="text-[16px] font-medium text-zinc-400">Falar com profissional</span>
             </button>
@@ -172,7 +175,7 @@ export function KioskInteractionFlow({ handleToggleTalking }: KioskInteractionFl
             animate={{ opacity: 1 }}
             exit={{ opacity: 0 }}
             transition={{ duration: 0.35 }}
-            className="flex h-full w-full flex-col items-center justify-center"
+            className="pointer-events-auto flex h-full w-full flex-col items-center justify-center"
           >
             <motion.button
               initial={{ opacity: 0 }}
@@ -227,7 +230,7 @@ export function KioskInteractionFlow({ handleToggleTalking }: KioskInteractionFl
             animate={{ opacity: 1, scale: 1 }}
             exit={{ opacity: 0, scale: 1.05 }}
             transition={{ duration: 0.4, ease: "easeOut" }}
-            className="flex h-full w-full flex-col items-center justify-center"
+            className="pointer-events-auto flex h-full w-full flex-col items-center justify-center"
           >
             <div className="relative mx-auto flex w-full max-w-sm flex-col gap-4 rounded-3xl border border-emerald-500/30 bg-emerald-950/20 p-6 pb-8 text-center backdrop-blur-sm">
               <div className="mt-2 mb-4 flex justify-center">

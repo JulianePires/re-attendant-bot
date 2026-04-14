@@ -3,173 +3,123 @@
 /**
  * Hook para gerenciar notificações em tempo real com suporte a áudio
  * Sincroniza com Supabase Realtime e reproduz alertas sonoros
+ *
+ * ATUALIZADO: Usa hook dedicado useNotificationSound para áudio robusto
  */
 
-import { useCallback, useEffect, useRef } from "react";
+import { useEffect } from "react";
 import { toast } from "sonner";
 import { supabase } from "@/lib/supabase-client";
 import { useQueryClient } from "@tanstack/react-query";
 import { obterResumoAtendimento } from "@/server/actions/atendimento";
 import { TipoChamada, TipoChamadaValue } from "@/types";
 import { ATENDIMENTOS_DIA_QUERY_KEY, FILA_ATIVA_QUERY_KEY } from "./useRealtimeQueue";
-
-type TipoSom = "normal" | "urgente";
-
-/**
- * Hook para gerenciar reprodução de áudio
- * Usa useRef para manter instâncias de áudio entre renders
- * Implementa fila de sons para casos onde autoplay está bloqueado
- */
-function useAudioNotifications() {
-  // Referências para instâncias de áudio - persistentes entre renders
-  const urgentAudioRef = useRef<HTMLAudioElement | null>(null);
-  const normalAudioRef = useRef<HTMLAudioElement | null>(null);
-
-  // Flag para rastrear se áudio foi desbloqueado pelo navegador
-  const isUnlockedRef = useRef(false);
-
-  // Fila de sons pendentes enquanto autoplay está bloqueado
-  const pendingSoundsRef = useRef<TipoSom[]>([]);
-
-  /**
-   * Cria nova instância de áudio com preload
-   * Memorizado para evitar recriação desnecessária
-   */
-  const createAudio = useCallback((src: string) => {
-    try {
-      const audio = new Audio(src);
-      audio.preload = "auto";
-      return audio;
-    } catch (error) {
-      console.error(`❌ Erro ao carregar áudio ${src}:`, error);
-      return null;
-    }
-  }, []);
-
-  /**
-   * Reproduz áudio da fila ou chamada direta
-   * Respeita restrições de autoplay do navegador
-   */
-  const playAudio = useCallback((tipo: TipoSom) => {
-    const target = tipo === "urgente" ? urgentAudioRef.current : normalAudioRef.current;
-
-    if (!target) {
-      console.warn(`⚠️ Áudio ${tipo} não disponível`);
-      return;
-    }
-
-    target.currentTime = 0;
-    target.play().catch((error) => {
-      // Erro silencioso: navegadores bloqueiam reprodução sem gesto do usuário
-      console.info(`ℹ️ Reprodução bloqueada (autoplay): ${error.message}`);
-    });
-  }, []);
-
-  /**
-   * Interface pública para reproduzir áudio
-   * Fila o som se áudio estiver bloqueado
-   */
-  const play = useCallback(
-    (tipo: TipoSom) => {
-      if (!isUnlockedRef.current) {
-        pendingSoundsRef.current.push(tipo);
-        return;
-      }
-
-      playAudio(tipo);
-    },
-    [playAudio]
-  );
-
-  /**
-   * Inicializa instâncias de áudio na primeira renderização
-   * Ouve eventos de usuário para desbloquear autoplay
-   */
-  useEffect(() => {
-    urgentAudioRef.current = createAudio("/sounds/alerta.mp3");
-    normalAudioRef.current = createAudio("/sounds/notificacao.mp3");
-
-    const unlockAudio = () => {
-      if (isUnlockedRef.current) {
-        return;
-      }
-
-      isUnlockedRef.current = true;
-      console.info("✅ Áudio desbloqueado pelo navegador");
-
-      // Reproduz sons que estavam na fila
-      pendingSoundsRef.current.forEach((tipo) => playAudio(tipo));
-      pendingSoundsRef.current = [];
-
-      // Remove event listeners após desbloqueio
-      window.removeEventListener("pointerdown", unlockAudio);
-      window.removeEventListener("keydown", unlockAudio);
-      window.removeEventListener("touchstart", unlockAudio);
-    };
-
-    // Habilita reprodução ao primeiro gesto do usuário
-    window.addEventListener("pointerdown", unlockAudio, { passive: true, once: true });
-    window.addEventListener("keydown", unlockAudio, { once: true });
-    window.addEventListener("touchstart", unlockAudio, { passive: true, once: true });
-
-    return () => {
-      window.removeEventListener("pointerdown", unlockAudio);
-      window.removeEventListener("keydown", unlockAudio);
-      window.removeEventListener("touchstart", unlockAudio);
-    };
-  }, [createAudio, playAudio]);
-
-  return play;
-}
+import { useNotificationSound } from "./useNotificationSound";
 
 export function useNotificationListener() {
   const queryClient = useQueryClient();
-  const play = useAudioNotifications();
+  const playSound = useNotificationSound();
 
   useEffect(() => {
-    // Inscreve-se em novos atendimentos via Realtime
-    const channel = supabase
-      .channel("public:atendimento")
+    // Listener para novos atendimentos na tabela
+    const atendimentoChannel = supabase
+      .channel("notificacoes_atendimentos")
       .on(
         "postgres_changes",
         { event: "INSERT", schema: "public", table: "atendimento" },
         async (payload) => {
-          const newAtendimento = payload.new as { id?: string; tipoChamada?: string };
+          console.info("🔔 Novo atendimento detectado via Realtime:", payload.new);
+
+          const newAtendimento = payload.new as {
+            id?: string;
+            tipoChamada?: string;
+            nomePaciente?: string;
+          };
+
           const atendimentoId = newAtendimento.id;
-          let nomePaciente = "Paciente";
+          let nomePaciente = newAtendimento.nomePaciente || "Paciente";
           let tipoChamada =
             (newAtendimento.tipoChamada as TipoChamadaValue | undefined) ?? TipoChamada.NORMAL;
 
-          // Busca dados completos do atendimento
-          if (atendimentoId) {
-            const resumo = await obterResumoAtendimento(atendimentoId);
-            if (resumo) {
-              nomePaciente = resumo.nomePaciente;
-              tipoChamada = resumo.tipoChamada;
+          // Busca dados completos do atendimento (fallback se necessário)
+          if (atendimentoId && !newAtendimento.nomePaciente) {
+            try {
+              const resumo = await obterResumoAtendimento(atendimentoId);
+              if (resumo) {
+                nomePaciente = resumo.nomePaciente;
+                tipoChamada = resumo.tipoChamada;
+              }
+            } catch (error) {
+              console.warn("⚠️ Erro ao buscar resumo do atendimento:", error);
             }
           }
 
-          // Toast visual
-          toast.info(`Novo Paciente: ${nomePaciente}`);
-
-          // Reprodução de áudio baseada no tipo
+          // Toast visual e reprodução de áudio
           if (tipoChamada === TipoChamada.URGENTE) {
-            play("urgente");
+            toast.error(`🚨 URGENTE: ${nomePaciente}`, {
+              description: "Atendimento prioritário aguardando",
+              duration: 8000,
+            });
+            playSound("urgente");
           } else {
-            play("normal");
+            toast.info(`Novo Paciente: ${nomePaciente}`, {
+              description: "Adicionado à fila de atendimento",
+            });
+            playSound("normal");
           }
 
-          // Invalidação do cache para refetch de dados
-          queryClient.invalidateQueries({ queryKey: ATENDIMENTOS_DIA_QUERY_KEY });
-          queryClient.invalidateQueries({ queryKey: ["notificacoes"] });
-          queryClient.invalidateQueries({ queryKey: FILA_ATIVA_QUERY_KEY });
+          // Invalidação agressiva de todas as queries relacionadas
+          await Promise.all([
+            queryClient.invalidateQueries({
+              queryKey: FILA_ATIVA_QUERY_KEY,
+              refetchType: "active",
+            }),
+            queryClient.invalidateQueries({
+              queryKey: ATENDIMENTOS_DIA_QUERY_KEY,
+              refetchType: "active",
+            }),
+            queryClient.invalidateQueries({ queryKey: ["notificacoes"], refetchType: "active" }),
+          ]);
         }
       )
-      .subscribe();
+      .subscribe((status) => {
+        if (status === "SUBSCRIBED") {
+          console.info("✅ Listener de notificações ativado");
+        } else if (status === "CHANNEL_ERROR") {
+          console.error("❌ Erro no canal de notificações");
+        }
+      });
 
-    // Cleanup: Remove inscrição ao desmontar
+    // Listener específico para a tabela de notificações
+    const notificacaoChannel = supabase
+      .channel("notificacoes_diretas")
+      .on(
+        "postgres_changes",
+        { event: "INSERT", schema: "public", table: "notificacao" },
+        (payload) => {
+          console.info("🔔 Nova notificação criada no banco:", payload.new);
+
+          // Invalidar e refetch imediato
+          queryClient.invalidateQueries({
+            queryKey: ["notificacoes"],
+            refetchType: "active",
+          });
+        }
+      )
+      .subscribe((status) => {
+        if (status === "SUBSCRIBED") {
+          console.info("✅ Listener de notificações diretas ativado");
+        }
+      });
+
+    // Cleanup: Remove ambos os canais ao desmontar
     return () => {
-      supabase.removeChannel(channel);
+      supabase.removeChannel(atendimentoChannel).then(() => {
+        console.info("🔕 Canal de atendimentos removido");
+      });
+      supabase.removeChannel(notificacaoChannel).then(() => {
+        console.info("🔕 Canal de notificações removido");
+      });
     };
-  }, [queryClient, play]);
+  }, [queryClient, playSound]);
 }

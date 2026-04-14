@@ -121,6 +121,28 @@ export async function finalizarAtendimento(atendimentoId: string) {
   }
 }
 
+/**
+ * AÇÃO PÚBLICA PARA FINALIZAR ATENDIMENTOS
+ * Permite finalizar atendimentos sem verificação de sessão
+ * Utilizada pela tela pública /publico/atendimentos
+ */
+export async function finalizarAtendimentoPublico(atendimentoId: string) {
+  try {
+    const atendimentoIdValidado = schemaAtendimentoId.parse(atendimentoId);
+
+    return await prisma.atendimento.update({
+      where: { id: atendimentoIdValidado },
+      data: {
+        status: StatusAtendimento.FINALIZADO,
+        finalizadoEm: new Date(),
+      },
+    });
+  } catch (error) {
+    console.error("[finalizarAtendimentoPublico]", error);
+    throw new Error("Não foi possível finalizar o atendimento.");
+  }
+}
+
 export async function obterFilaAtiva() {
   try {
     const atendimentos = await prisma.atendimento.findMany({
@@ -143,6 +165,33 @@ export async function obterFilaAtiva() {
   }
 }
 
+/**
+ * AÇÃO PÚBLICA PARA TELA DA TV
+ * Retorna fila ativa sem verificação de sessão (acesso anônimo)
+ * Utilizada pela tela pública /tv que será exibida na sala de espera
+ */
+export async function obterFilaPublica() {
+  try {
+    const atendimentos = await prisma.atendimento.findMany({
+      where: { status: StatusAtendimento.AGUARDANDO },
+      orderBy: [{ tipoChamada: "desc" }, { criadoEm: "asc" }],
+      select: {
+        id: true,
+        nomePaciente: true,
+        tipoChamada: true,
+        status: true,
+        criadoEm: true,
+        finalizadoEm: true,
+      },
+    });
+
+    return atendimentos.map((item) => schemaAtendimentoNaFila.parse(item));
+  } catch (error) {
+    console.error("[obterFilaPublica]", error);
+    throw new Error("Não foi possível carregar a fila pública.");
+  }
+}
+
 export async function obterAtendimentosDoDia() {
   try {
     const turnoAtual = obterTurnoAtual(new Date());
@@ -155,7 +204,7 @@ export async function obterAtendimentosDoDia() {
           gte: turnoAtual.inicio,
           lte: turnoAtual.fim,
         },
-      } as any,
+      },
       orderBy: { finalizadoEm: "desc" },
       select: {
         id: true,
@@ -186,10 +235,10 @@ export async function arquivarAtendimentosDoTurno() {
           gte: turnoAtual.inicio,
           lte: turnoAtual.fim,
         },
-      } as any,
+      },
       data: {
         arquivadoTurno: true,
-      } as any,
+      },
     });
 
     return {

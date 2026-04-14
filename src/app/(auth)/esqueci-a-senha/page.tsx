@@ -66,12 +66,7 @@ export default function ForgetPasswordPage() {
 
   return (
     <div className="relative flex min-h-screen w-full items-center justify-center overflow-hidden bg-zinc-950 p-4 text-zinc-100">
-      {/* Decorações visuais ao fundo */}
-      <div className="pointer-events-none absolute inset-0 bg-[radial-gradient(ellipse_at_center,var(--tw-gradient-stops))] from-violet-900/10 via-zinc-950 to-zinc-950"></div>
-      <div className="pointer-events-none absolute -top-[20%] -left-[10%] h-[50%] w-[50%] rounded-full bg-violet-600/10 blur-[120px]"></div>
-      <div className="pointer-events-none absolute -right-[10%] -bottom-[20%] h-[50%] w-[50%] rounded-full bg-indigo-600/10 blur-[120px]"></div>
-
-      <Card className="relative z-10 w-full max-w-md animate-in rounded-3xl border-zinc-800/60 bg-zinc-900/60 shadow-2xl backdrop-blur-xl duration-500 zoom-in-95 fade-in">
+      <Card className="relative z-10 w-full max-w-7xl animate-in rounded-3xl border-zinc-800/60 bg-zinc-900/60 shadow-2xl backdrop-blur-xl duration-500 zoom-in-95 fade-in">
         <CardHeader className="pt-8 pb-8 text-center">
           <div className="mx-auto mb-4 flex h-16 w-16 items-center justify-center rounded-2xl border border-violet-500/20 bg-violet-500/10 shadow-[0_0_20px_rgba(124,58,237,0.1)]">
             <Mail className="h-8 w-8 text-violet-400" />

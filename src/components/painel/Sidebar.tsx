@@ -77,7 +77,7 @@ export function Sidebar() {
 
       {/* Rodapé da sidebar — versão ou info secundária */}
       <div className="border-border border-t px-5 py-3">
-        <p className="text-muted-foreground text-xs">v1.0.0 — Beta</p>
+        <p className="text-muted-foreground text-xs">v2.0.0 — Beta</p>
       </div>
     </aside>
   );

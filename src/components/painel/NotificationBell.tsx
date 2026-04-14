@@ -41,6 +41,10 @@ export function NotificationBell() {
   const { data: notificacoes = [] } = useQuery<NotificacaoItem[]>({
     queryKey: ["notificacoes"],
     queryFn: obterNotificacoes,
+    staleTime: 0, // Sempre buscar dados frescos
+    refetchInterval: 5000, // Refetch a cada 5s como fallback do Realtime
+    refetchOnWindowFocus: true,
+    refetchIntervalInBackground: false, // Só refetch quando aba está ativa
   });
 
   const totalNaoLidas = useMemo(
@@ -87,7 +91,10 @@ export function NotificationBell() {
         </button>
       </DropdownMenuTrigger>
 
-      <DropdownMenuContent align="end" className="w-[24rem] p-0">
+      <DropdownMenuContent
+        align="end"
+        className="z-1000 w-[24rem] bg-slate-50 p-0 dark:bg-slate-900"
+      >
         <div className="flex items-center justify-between px-3 py-2">
           <DropdownMenuLabel className="p-0">Notificações</DropdownMenuLabel>
           <button
