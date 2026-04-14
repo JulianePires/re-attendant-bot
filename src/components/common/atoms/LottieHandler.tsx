@@ -10,7 +10,11 @@ type AnimationName =
   | "search-for-interface"
   | "loader"
   | "bot-greeting"
-  | "doctor-loading";
+  | "doctor-loading"
+  | "green-eye"
+  | "eyes"
+  | "standy-mouth"
+  | "talking-mouth";
 
 // Mapeamento dos nomes para os caminhos dos arquivos JSON na pasta `public`
 const animationMap: Record<AnimationName, string> = {
@@ -20,6 +24,10 @@ const animationMap: Record<AnimationName, string> = {
   loader: "/lottie/loader.json",
   "bot-greeting": "/lottie/ai-bot.json", // Corrigido para o nome do arquivo correto
   "doctor-loading": "/lottie/doctor.json", // Corrigido para o nome do arquivo correto
+  "green-eye": "/lottie/green-eye.json",
+  eyes: "/lottie/eyes.json",
+  "standy-mouth": "/lottie/standy-mouth.json",
+  "talking-mouth": "/lottie/talking-mouth.json",
 };
 
 interface LottieHandlerProps extends Omit<LottieComponentProps, "animationData"> {

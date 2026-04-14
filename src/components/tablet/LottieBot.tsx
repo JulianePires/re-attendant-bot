@@ -1,44 +1,31 @@
 "use client";
 
-import dynamic from "next/dynamic";
-import { BotAvatar } from "@/components/tablet/BotAvatar";
 import { cn } from "@/lib/utils";
-import botAnimation from "../../../public/lottie/ai-bot.json";
-
-const Lottie = dynamic(() => import("lottie-react").then((mod) => mod.default), {
-  ssr: false,
-});
-
-type Tamanho = "sm" | "md" | "lg";
+import { LottieHandler } from "@/components/common/atoms/LottieHandler";
 
 interface LottieBotProps {
-  animationData?: object;
-  tamanho?: Tamanho;
   className?: string;
+  isTalking?: boolean;
 }
 
-const tamanhos: Record<Tamanho, string> = {
-  sm: "h-28 w-28",
-  md: "h-44 w-44",
-  lg: "h-60 w-60",
-};
-
-export function LottieBot({
-  animationData = botAnimation,
-  tamanho = "lg",
-  className,
-}: LottieBotProps) {
-  if (!animationData) {
-    return <BotAvatar tamanho={tamanho} className={className} />;
-  }
-
+export function LottieBot({ className, isTalking = false }: LottieBotProps) {
   return (
     <div
       role="img"
       aria-label="Assistente virtual da clínica"
-      className={cn("flex items-center justify-center", tamanhos[tamanho], className)}
+      className={cn("flex flex-col items-center justify-between", className)}
     >
-      <Lottie animationData={animationData} loop className="h-full w-full" aria-hidden="true" />
+      <span className="flex items-baseline justify-between">
+        <LottieHandler animationName="green-eye" loop className="h-full w-60" aria-hidden="true" />
+        <LottieHandler animationName="green-eye" loop className="h-full w-60" aria-hidden="true" />
+      </span>
+
+      <LottieHandler
+        animationName={isTalking ? "talking-mouth" : "standy-mouth"}
+        loop
+        className="h-3/4 w-auto"
+        aria-hidden="true"
+      />
     </div>
   );
 }

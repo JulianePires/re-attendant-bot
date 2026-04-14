@@ -5,6 +5,7 @@ import { QueryProvider } from "@/components/providers/query-provider";
 import "./globals.css";
 import { cn } from "@/lib/utils";
 import { Toaster } from "sonner";
+import { Analytics } from "@vercel/analytics/next";
 
 const geist = Geist({ subsets: ["latin"], variable: "--font-sans" });
 
@@ -38,6 +39,7 @@ export default function RootLayout({ children }: Readonly<{ children: React.Reac
           <QueryProvider>
             {children}
             <Toaster />
+            <Analytics />
           </QueryProvider>
         </ThemeProvider>
       </body>

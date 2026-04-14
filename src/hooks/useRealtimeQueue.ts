@@ -15,18 +15,22 @@ type RealtimeAtendimento = {
   id: string;
   pacienteId: string;
   tipoChamada: string;
+  status?: string;
   criadoEm: string;
+  finalizadoEm?: string | null;
   paciente: {
     id: string;
     name: string;
   };
 };
 
-type RealtimeInsertPayload = {
+type RealtimePayload = {
   id: string;
   pacienteId: string;
   tipoChamada: string;
+  status?: string;
   criadoEm: string;
+  finalizadoEm?: string | null;
 };
 
 /**
@@ -43,8 +47,79 @@ export function useRealtimeQueue() {
   const queryClient = useQueryClient();
 
   useEffect(() => {
-    // Inscreve-se em INSERTs na tabela Atendimento
-    // Nota: Apenas novos atendimentos disparam este evento
+    const normalizarTipoChamada = (tipo?: string) => (tipo ?? "normal").toLowerCase();
+
+    const ordenarFila = (lista: RealtimeAtendimento[]) => {
+      return [...lista].sort((a, b) => {
+        const aUrgente = normalizarTipoChamada(a.tipoChamada) === "urgente";
+        const bUrgente = normalizarTipoChamada(b.tipoChamada) === "urgente";
+
+        if (aUrgente && !bUrgente) return -1;
+        if (!aUrgente && bUrgente) return 1;
+
+        const dataA = new Date(a.criadoEm).getTime();
+        const dataB = new Date(b.criadoEm).getTime();
+        return dataA - dataB;
+      });
+    };
+
+    const upsertAtendimentoNaFila = (novo: Partial<RealtimePayload>) => {
+      if (!novo.id || !novo.pacienteId) {
+        return;
+      }
+
+      const atendimentoId = novo.id;
+      const pacienteId = novo.pacienteId;
+
+      queryClient.setQueryData<RealtimeAtendimento[]>(FILA_ATIVA_QUERY_KEY, (oldData = []) => {
+        if (!Array.isArray(oldData)) {
+          return oldData;
+        }
+
+        const status = (novo.status ?? "aguardando").toLowerCase();
+        const semItem = oldData.filter((att) => att.id !== atendimentoId);
+
+        // Se não estiver aguardando, remove da fila ativa.
+        if (status !== "aguardando") {
+          return semItem;
+        }
+
+        const atendimentoOtimista: RealtimeAtendimento = {
+          id: atendimentoId,
+          pacienteId,
+          tipoChamada: normalizarTipoChamada(novo.tipoChamada),
+          status,
+          criadoEm: novo.criadoEm ?? new Date().toISOString(),
+          finalizadoEm: novo.finalizadoEm ?? null,
+          paciente: {
+            id: pacienteId,
+            name: "Sincronizando dados...",
+          },
+        };
+
+        return ordenarFila([atendimentoOtimista, ...semItem]);
+      });
+    };
+
+    const removerAtendimentoDaFila = (atendimentoId?: string) => {
+      if (!atendimentoId) {
+        return;
+      }
+
+      queryClient.setQueryData<RealtimeAtendimento[]>(FILA_ATIVA_QUERY_KEY, (oldData = []) => {
+        if (!Array.isArray(oldData)) {
+          return oldData;
+        }
+
+        return oldData.filter((att) => att.id !== atendimentoId);
+      });
+    };
+
+    const sincronizarQueries = () => {
+      queryClient.invalidateQueries({ queryKey: FILA_ATIVA_QUERY_KEY });
+      queryClient.invalidateQueries({ queryKey: ATENDIMENTOS_DIA_QUERY_KEY });
+    };
+
     const channel = supabase
       .channel("atendimentos_fila_sync")
       .on(
@@ -55,76 +130,55 @@ export function useRealtimeQueue() {
           table: "atendimento",
         },
         (payload) => {
-          const novoAtendimento = payload.new as Partial<RealtimeInsertPayload>;
-
-          // Validação defensiva
-          if (!novoAtendimento || !novoAtendimento.id || !novoAtendimento.pacienteId) {
-            console.warn("⚠️ Recebido payload inválido do Realtime:", payload);
+          const novoAtendimento = payload.new as Partial<RealtimePayload>;
+          if (!novoAtendimento?.id || !novoAtendimento?.pacienteId) {
+            console.warn("⚠️ Payload INSERT inválido no Realtime:", payload);
             return;
           }
 
-          const atendimentoId = novoAtendimento.id;
-          const pacienteId = novoAtendimento.pacienteId;
+          upsertAtendimentoNaFila(novoAtendimento);
+          sincronizarQueries();
+        }
+      )
+      .on(
+        "postgres_changes",
+        {
+          event: "UPDATE",
+          schema: "public",
+          table: "atendimento",
+        },
+        (payload) => {
+          const atendimentoAtualizado = payload.new as Partial<RealtimePayload>;
+          if (!atendimentoAtualizado?.id) {
+            console.warn("⚠️ Payload UPDATE inválido no Realtime:", payload);
+            return;
+          }
 
-          // Atualização Otimista: Injeta instantaneamente a novo atendimento no cache
-          // Usar setQueryData evita delay de rede durante refetch
-          queryClient.setQueryData<RealtimeAtendimento[]>(FILA_ATIVA_QUERY_KEY, (oldData = []) => {
-            if (!Array.isArray(oldData)) {
-              return oldData;
-            }
-
-            // Evita duplicação: verifica se já existe este ID
-            const jaExiste = oldData.some((att) => att.id === novoAtendimento.id);
-            if (jaExiste) {
-              console.info("ℹ️ Atendimento já existe no cache, pulando duplicação");
-              return oldData;
-            }
-
-            // Cria placeholder com paciente em sincronização
-            const atendimentoOtimista: RealtimeAtendimento = {
-              id: atendimentoId,
-              pacienteId,
-              tipoChamada: novoAtendimento.tipoChamada ?? "normal",
-              criadoEm: novoAtendimento.criadoEm ?? new Date().toISOString(),
-              paciente: {
-                id: pacienteId,
-                name: "Sincronizando dados...",
-              },
-            };
-
-            // Insere no topo da lista
-            const novaLista = [atendimentoOtimista, ...oldData];
-
-            // Re-aplica ordenação: Urgentes primeiro, depois ordenados por data criação
-            return novaLista.sort((a, b) => {
-              // Urgentes sempre no topo
-              if (a.tipoChamada === "URGENTE" && b.tipoChamada !== "URGENTE") return -1;
-              if (b.tipoChamada === "URGENTE" && a.tipoChamada !== "URGENTE") return 1;
-
-              // Se mesmo tipo, ordena por data (mais antigos primeiro)
-              const dataA = new Date(a.criadoEm).getTime();
-              const dataB = new Date(b.criadoEm).getTime();
-              return dataA - dataB;
-            });
-          });
-
-          // Refetch silencioso em background para obter JOINs completos (dados do paciente, etc)
-          // O usuário vê resultado otimista imediatamente, depois vê dados precisos conforme chegam
-          queryClient.invalidateQueries({ queryKey: FILA_ATIVA_QUERY_KEY });
-          queryClient.invalidateQueries({
-            queryKey: ATENDIMENTOS_DIA_QUERY_KEY,
-          });
-
-          console.info("✅ Novo atendimento recebido em tempo real:", novoAtendimento.id);
+          upsertAtendimentoNaFila(atendimentoAtualizado);
+          sincronizarQueries();
+        }
+      )
+      .on(
+        "postgres_changes",
+        {
+          event: "DELETE",
+          schema: "public",
+          table: "atendimento",
+        },
+        (payload) => {
+          const removido = payload.old as Partial<RealtimePayload>;
+          removerAtendimentoDaFila(removido?.id);
+          sincronizarQueries();
         }
       )
       .subscribe((status) => {
         if (status === "SUBSCRIBED") {
+          // Garante hidratação inicial do painel sem depender de refresh manual.
+          sincronizarQueries();
           console.info("🔔 Sincronização realtime da fila ativada");
         }
       });
 
-    // Cleanup: Remove inscrição ao desmontar o hook
     return () => {
       supabase.removeChannel(channel);
       console.info("🔕 Sincronização realtime da fila removida");

@@ -1,56 +1,38 @@
 "use client";
 
-// ================================================================
-// Tela de Standby — "/" (raiz do totem)
-//
-// Esta é a tela principal do kiosk. Exibida em loop quando nenhum
-// paciente está interagindo. Dois princípios guiam o design:
-//
-// 1. ACESSIBILIDADE EXTREMA: botões gigantes, contraste alto e
-//    aria-labels descritivos para usuários com baixa acuidade visual.
-//
-// 2. AFFORDANCE CLARA: o paciente nunca deve ter dúvida sobre o que
-//    tocar. Por isso há apenas duas ações possíveis na tela inicial.
-//
-// O layout kiosk (gradiente, sem scroll, select-none) é aplicado
-// inline aqui — o route group (tablet) cuidará das sub-páginas
-// futuras (/fila, /sucesso, etc.).
-// ================================================================
-
-import { KioskInteractionFlow } from "@/components/tablet/KioskInteractionFlow";
+import { useState } from "react";
 import { LottieBot } from "@/components/tablet/LottieBot";
-import { VoiceGreeter } from "@/components/tablet/VoiceGreeter";
-import { Suspense } from "react";
+import { KioskInteractionFlow } from "@/components/tablet/KioskInteractionFlow";
 
-export default function TabletStandbyPage() {
+export default function TabletPage() {
+  const [isTalking, setIsTalking] = useState(false);
+
   return (
-    <div className="relative flex min-h-screen w-screen flex-col items-center justify-center overflow-hidden bg-zinc-950 text-zinc-100 select-none">
-      {/* Background radial gradient sutil estilo Dark Mode puro */}
-      <div className="absolute inset-0 bg-[radial-gradient(ellipse_at_top,var(--tw-gradient-stops))] from-violet-900/10 via-zinc-950 to-zinc-950"></div>
+    <div className="relative flex h-screen w-screen flex-col items-center justify-center overflow-hidden bg-zinc-950 select-none">
+      {/* Robot face frame */}
+      <div className="relative flex flex-col items-center">
+        {/* Head shell */}
+        <div className="relative flex flex-col items-center rounded-[4rem] border-2 border-violet-700/50 bg-linear-to-b from-zinc-700 to-zinc-900 px-16 pt-12 pb-10 shadow-[0_0_60px_rgba(0,0,0,0.6),inset_0_1px_0_rgba(255,255,255,0.05)]">
+          {/* Ear accents */}
+          <div className="absolute top-1/3 -left-4 h-16 w-3 rounded-l-full bg-violet-700/60" />
+          <div className="absolute top-1/3 -right-4 h-16 w-3 rounded-r-full bg-violet-700/60" />
 
-      {/* Luzes decorativas */}
-      <div
-        aria-hidden="true"
-        className="pointer-events-none absolute -top-40 -left-32 h-112 w-md rounded-full bg-violet-600/10 blur-3xl"
-      />
-      <div
-        aria-hidden="true"
-        className="pointer-events-none absolute -right-32 -bottom-40 h-112 w-md rounded-full bg-indigo-600/10 blur-3xl"
-      />
+          {/* Antenna */}
+          <div className="-tranviolet-x-1/2 absolute -top-7 left-1/2 flex flex-col items-center">
+            <div className="h-3 w-3 rounded-full bg-emerald-400 shadow-[0_0_10px_rgba(52,211,153,0.6)]" />
+            <div className="h-7 w-1 rounded-full bg-violet-600" />
+          </div>
 
-      {/* Client Components atomicos isolam TTS, animacao e interacao */}
-      <Suspense fallback={null}>
-        <VoiceGreeter />
-      </Suspense>
-
-      <main className="relative z-10 flex h-full w-full flex-col items-center gap-6 px-6 py-8">
-        <div className="flex animate-in flex-col items-center gap-4 duration-700 zoom-in-95 fade-in">
-          <LottieBot tamanho="md" />
+          <LottieBot isTalking={isTalking} className="h-[42vh] w-[42vh]" />
         </div>
 
-        <section className="flex w-full flex-1 flex-col items-center justify-center">
-          <KioskInteractionFlow />
-        </section>
+        {/* Chin / neck connector */}
+        <div className="h-4 w-24 rounded-b-2xl bg-violet-800 shadow-inner" />
+      </div>
+
+      {/* Interaction flow — overlays at bottom */}
+      <main className="absolute inset-0 z-10 flex h-full w-full flex-col">
+        <KioskInteractionFlow handleToggleTalking={setIsTalking} />
       </main>
     </div>
   );
