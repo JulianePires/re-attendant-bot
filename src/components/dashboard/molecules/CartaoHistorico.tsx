@@ -13,7 +13,7 @@ export function CartaoHistorico({ atendimento }: { atendimento: AtendimentoNaFil
         "animate-in duration-500 fill-mode-both fade-in slide-in-from-bottom-4 focus-within:ring-2 focus-within:ring-violet-500 focus-within:ring-offset-2 focus-within:ring-offset-zinc-950"
       )}
       tabIndex={0}
-      aria-label={`Paciente ${atendimento.paciente?.name ?? "Desconhecido"}`}
+      aria-label={`Paciente ${atendimento.nomePaciente ?? "Desconhecido"}`}
     >
       <div className="flex h-10 w-10 shrink-0 items-center justify-center rounded-full border border-emerald-500/30 bg-emerald-500/10">
         <CheckCircle2 className="h-5 w-5 text-emerald-400" aria-hidden="true" />
@@ -22,7 +22,7 @@ export function CartaoHistorico({ atendimento }: { atendimento: AtendimentoNaFil
       <div className="flex min-w-0 flex-1 flex-col gap-1">
         <div className="flex items-center gap-2">
           <p className="text-foreground truncate text-base font-semibold">
-            {atendimento.paciente?.name ?? "Paciente"}
+            {atendimento.nomePaciente ?? "Paciente"}
           </p>
           <BadgeTipo tipo={atendimento.tipoChamada} />
         </div>

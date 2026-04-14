@@ -29,20 +29,20 @@ model User {
   updatedAt     DateTime
 
   // Campos adicionados pelo plugin de Admin do BetterAuth para RBAC.
-  // O plugin gerencia automaticamente a atribuição de roles.
-  role      String?   @default("paciente")
+  // Role estritamente para profissionais: 'admin' | 'profissional'
+  // Pacientes NÃO são mais usuários do sistema
+  role      String?   @default("profissional")
   banned    Boolean?
   banReason String?
   banExpires DateTime?
 
-  // Campos customizados da clínica
+  // Campos customizados da clínica (apenas para profissionais)
   cpf          String?   @unique
   ultimoAcesso DateTime?
 
-  // Relações
+  // Relações (apenas com entidades administrativas)
   sessions     Session[]
   accounts     Account[]
-  atendimentos Atendimento[]
   notificacoes Notificacao[]
 
   @@map("user")
@@ -117,8 +117,9 @@ model Notificacao {
 
 model Atendimento {
   id         String   @id @default(cuid())
-  pacienteId String
-  paciente   User     @relation(fields: [pacienteId], references: [id], onDelete: Cascade)
+  
+  // Nome do paciente armazenado diretamente (sem relação com User)
+  nomePaciente String
 
   // Discriminadores de tipo: 'normal' | 'urgente'
   tipoChamada String @default("normal")

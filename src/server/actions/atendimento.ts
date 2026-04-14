@@ -2,10 +2,8 @@
 
 import { prisma } from "@/lib/prisma";
 import { obterTurnoAtual } from "@/lib/utils/turnos";
-import { patientQueueSchema } from "@/lib/validations/schemas";
 import { StatusAtendimento, TipoChamada, TipoChamadaValue } from "@/types";
 import { z } from "zod";
-import { getSession } from "@/lib/auth-client";
 
 type NotificacaoCreateManyArgs = {
   data: Array<{
@@ -24,7 +22,6 @@ type PrismaWithNotificacao = typeof prisma & {
 
 const prismaWithNotificacao = prisma as PrismaWithNotificacao;
 
-const schemaPacienteId = z.string().cuid("ID de paciente inválido");
 const schemaAtendimentoId = z.string().cuid("ID de atendimento inválido");
 
 async function criarNotificacoesParaEquipe(params: {
@@ -59,78 +56,51 @@ async function criarNotificacoesParaEquipe(params: {
   });
 }
 
+// Schema simplificado: atendimento não tem mais relação com User
 const schemaAtendimentoNaFila = z.object({
   id: z.string(),
-  pacienteId: z.string(),
-  paciente: z.object({
-    id: z.string(),
-    name: z.string(),
-  }),
+  nomePaciente: z.string(),
   tipoChamada: z.enum([TipoChamada.NORMAL, TipoChamada.URGENTE]),
   status: z.enum([StatusAtendimento.AGUARDANDO, StatusAtendimento.FINALIZADO]),
   criadoEm: z.date(),
   finalizadoEm: z.date().nullable(),
 });
 
-export async function entrarNaFila(pacienteId: string) {
+/**
+ * AÇÃO PRINCIPAL DO KIOSK
+ * Registra um novo atendimento na fila.
+ * Não cria usuário - salva o nome direto no atendimento.
+ */
+export async function registrarEEntrarNaFila(dados: {
+  nome: string;
+  tipoChamada: TipoChamadaValue;
+}) {
   try {
-    const pacienteIdValidado = schemaPacienteId.parse(pacienteId);
+    const nomePaciente = dados.nome.trim();
 
+    if (nomePaciente.length < 2) {
+      throw new Error("Nome deve ter pelo menos 2 caracteres.");
+    }
+
+    // Cria o atendimento diretamente, sem relação com User
     const atendimento = await prisma.atendimento.create({
       data: {
-        pacienteId: pacienteIdValidado,
-        tipoChamada: TipoChamada.NORMAL,
+        nomePaciente,
+        tipoChamada: dados.tipoChamada,
         status: StatusAtendimento.AGUARDANDO,
-      },
-      include: {
-        paciente: {
-          select: {
-            name: true,
-          },
-        },
       },
     });
 
+    // Notifica os profissionais
     await criarNotificacoesParaEquipe({
-      nomePaciente: atendimento.paciente.name,
-      tipoChamada: atendimento.tipoChamada as TipoChamadaValue,
+      nomePaciente,
+      tipoChamada: dados.tipoChamada,
     });
 
     return atendimento;
   } catch (error) {
-    console.error("[entrarNaFila]", error);
-    throw new Error("Não foi possível entrar na fila.");
-  }
-}
-
-export async function chamarUrgencia(pacienteId: string) {
-  try {
-    const pacienteIdValidado = schemaPacienteId.parse(pacienteId);
-
-    const atendimento = await prisma.atendimento.create({
-      data: {
-        pacienteId: pacienteIdValidado,
-        tipoChamada: TipoChamada.URGENTE,
-        status: StatusAtendimento.AGUARDANDO,
-      },
-      include: {
-        paciente: {
-          select: {
-            name: true,
-          },
-        },
-      },
-    });
-
-    await criarNotificacoesParaEquipe({
-      nomePaciente: atendimento.paciente.name,
-      tipoChamada: atendimento.tipoChamada as TipoChamadaValue,
-    });
-
-    return atendimento;
-  } catch (error) {
-    console.error("[chamarUrgencia]", error);
-    throw new Error("Não foi possível registrar a urgência.");
+    console.error("[registrarEEntrarNaFila]", error);
+    throw new Error("Não foi possível registrar o atendimento.");
   }
 }
 
@@ -156,13 +126,13 @@ export async function obterFilaAtiva() {
     const atendimentos = await prisma.atendimento.findMany({
       where: { status: StatusAtendimento.AGUARDANDO },
       orderBy: [{ tipoChamada: "desc" }, { criadoEm: "asc" }],
-      include: {
-        paciente: {
-          select: {
-            id: true,
-            name: true,
-          },
-        },
+      select: {
+        id: true,
+        nomePaciente: true,
+        tipoChamada: true,
+        status: true,
+        criadoEm: true,
+        finalizadoEm: true,
       },
     });
 
@@ -187,13 +157,13 @@ export async function obterAtendimentosDoDia() {
         },
       } as any,
       orderBy: { finalizadoEm: "desc" },
-      include: {
-        paciente: {
-          select: {
-            id: true,
-            name: true,
-          },
-        },
+      select: {
+        id: true,
+        nomePaciente: true,
+        tipoChamada: true,
+        status: true,
+        criadoEm: true,
+        finalizadoEm: true,
       },
     });
 
@@ -201,72 +171,6 @@ export async function obterAtendimentosDoDia() {
   } catch (error) {
     console.error("[obterAtendimentosDoDia]", error);
     throw new Error("Não foi possível carregar os atendimentos do dia.");
-  }
-}
-
-export async function entrarNaFilaComValidacao(dados: z.infer<typeof patientQueueSchema>) {
-  try {
-    const dadosValidados = patientQueueSchema.parse(dados);
-
-    const paciente = await prisma.user.create({
-      data: {
-        id: crypto.randomUUID(),
-        name: dadosValidados.nome,
-        emailVerified: false,
-        role: "paciente",
-        createdAt: new Date(),
-        updatedAt: new Date(),
-      } as any,
-    });
-
-    return await prisma.atendimento.create({
-      data: {
-        pacienteId: paciente.id,
-        tipoChamada: TipoChamada.NORMAL,
-        status: StatusAtendimento.AGUARDANDO,
-      },
-    });
-  } catch (error) {
-    console.error("[entrarNaFilaComValidacao]", error);
-    throw new Error("Não foi possível entrar na fila.");
-  }
-}
-
-export async function registrarEEntrarNaFila(dados: {
-  nome: string;
-  tipoChamada: TipoChamadaValue;
-}) {
-  try {
-    const nome = dados.nome.trim();
-
-    const paciente = await prisma.user.create({
-      data: {
-        id: crypto.randomUUID(),
-        name: nome,
-        emailVerified: false,
-        role: "paciente",
-        createdAt: new Date(),
-        updatedAt: new Date(),
-      } as any,
-    });
-
-    const atendimento = await prisma.atendimento.create({
-      data: {
-        pacienteId: paciente.id,
-        tipoChamada: dados.tipoChamada,
-        status: StatusAtendimento.AGUARDANDO,
-      },
-    });
-
-    await criarNotificacoesParaEquipe({
-      nomePaciente: paciente.name,
-      tipoChamada: dados.tipoChamada,
-    });
-
-    return atendimento;
-  } catch (error) {
-    console.error("[registrarEEntrarNaFila]", error);
-    throw new Error("Não foi possível registrar o atendimento.");
   }
 }
 
@@ -300,22 +204,13 @@ export async function arquivarAtendimentosDoTurno() {
 
 export async function obterResumoAtendimento(atendimentoId: string) {
   try {
-    const session = await getSession();
-    if (!session?.data?.user?.id) {
-      return null;
-    }
-
     const atendimentoIdValidado = schemaAtendimentoId.parse(atendimentoId);
 
     const atendimento = await prisma.atendimento.findUnique({
       where: { id: atendimentoIdValidado },
       select: {
+        nomePaciente: true,
         tipoChamada: true,
-        paciente: {
-          select: {
-            name: true,
-          },
-        },
       },
     });
 
@@ -324,7 +219,7 @@ export async function obterResumoAtendimento(atendimentoId: string) {
     }
 
     return {
-      nomePaciente: atendimento.paciente.name,
+      nomePaciente: atendimento.nomePaciente,
       tipoChamada: atendimento.tipoChamada as TipoChamadaValue,
     };
   } catch (error) {

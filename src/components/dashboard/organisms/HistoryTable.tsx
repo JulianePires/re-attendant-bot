@@ -18,12 +18,9 @@ import { Loader2, AlertCircle } from "lucide-react";
 
 type HistoricoItem = {
   id: string;
+  nomePaciente: string;
   criadoEm: Date | string;
   finalizadoEm: Date | string | null;
-  paciente: {
-    name: string;
-    cpf: string | null;
-  };
 };
 
 const HistoryTable = () => {
@@ -68,7 +65,6 @@ const HistoryTable = () => {
                 <TableHeader>
                   <TableRow className="border-zinc-800/50 hover:bg-transparent">
                     <TableHead className="font-semibold text-zinc-300">Paciente</TableHead>
-                    <TableHead className="font-semibold text-zinc-300">CPF</TableHead>
                     <TableHead className="font-semibold text-zinc-300">Chegada</TableHead>
                     <TableHead className="font-semibold text-zinc-300">Atendimento</TableHead>
                   </TableRow>
@@ -81,12 +77,7 @@ const HistoryTable = () => {
                       style={{ animationDelay: `${index * 50}ms` }}
                     >
                       <TableCell className="font-medium text-zinc-400">
-                        {item.paciente.name}
-                      </TableCell>
-                      <TableCell className="text-zinc-400">
-                        {item.paciente.cpf
-                          ? item.paciente.cpf.replace(/(\d{3})(\d{3})(\d{3})(\d{2})/, "$1.$2.$3-$4")
-                          : "-"}
+                        {item.nomePaciente}
                       </TableCell>
                       <TableCell className="text-zinc-400">
                         {format(new Date(item.criadoEm), "HH:mm")}

@@ -24,7 +24,7 @@ export function CartaoFila({
           : "hover:border-violet-500/30 hover:shadow-[0_0_20px_rgba(124,58,237,0.1)]"
       )}
       tabIndex={0}
-      aria-label={`Paciente ${item.paciente?.name ?? "Desconhecido"}, posição ${item.posicao}${isUrgente ? ", urgente" : ""}`}
+      aria-label={`Paciente ${item.nomePaciente ?? "Desconhecido"}, posição ${item.posicao}${isUrgente ? ", urgente" : ""}`}
     >
       {/* Posição na fila */}
       <div
@@ -44,7 +44,7 @@ export function CartaoFila({
         <div className="flex items-center gap-2">
           <User className="h-5 w-5 text-violet-400" aria-hidden="true" />
           <span className="text-foreground truncate text-base font-semibold">
-            {item.paciente?.name ?? "Paciente"}
+            {item.nomePaciente ?? "Paciente"}
           </span>
 
           <BadgeTipo tipo={item.tipoChamada} />
@@ -65,7 +65,7 @@ export function CartaoFila({
             : "bg-violet-600 shadow-[0_0_10px_rgba(124,58,237,0.3)] hover:bg-violet-500 hover:shadow-[0_0_20px_rgba(124,58,237,0.5)] focus-visible:ring-violet-500",
           "disabled:cursor-not-allowed disabled:bg-zinc-800 disabled:text-zinc-500 disabled:shadow-none disabled:hover:translate-y-0 disabled:hover:scale-100"
         )}
-        aria-label={`Chamar paciente ${item.paciente?.name ?? "Paciente"}`}
+        aria-label={`Chamar paciente ${item.nomePaciente ?? "Paciente"}`}
         onClick={() => onAtender(item.id)}
         disabled={isLoading}
         type="button"

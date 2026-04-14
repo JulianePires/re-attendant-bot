@@ -17,7 +17,6 @@ export const StatusAtendimento = {
 } as const;
 
 export const Role = {
-  PACIENTE: "paciente",
   PROFISSIONAL: "profissional",
   ADMIN: "admin",
 } as const;
@@ -28,7 +27,7 @@ export const Role = {
 // e em Server Actions (server). O mesmo schema valida ambos os lados.
 // ================================================================
 
-export const schemaCadastroPaciente = z.object({
+export const schemaCadastroProfissional = z.object({
   name: z.string().min(3, "Nome deve ter no mínimo 3 caracteres"),
   email: z.string().email("E-mail inválido"),
   cpf: z.string().regex(/^\d{11}$/, "CPF deve conter exatamente 11 dígitos numéricos"),
@@ -40,8 +39,9 @@ export const schemaLoginEmail = z.object({
   password: z.string().min(1, "Senha é obrigatória"),
 });
 
-export const schemaNovoAtendimento = z.object({
-  pacienteId: z.string().cuid("ID de paciente inválido"),
+// Schema para o Kiosk (entrada de paciente na fila)
+export const schemaEntradaKiosk = z.object({
+  nome: z.string().trim().min(2, "Nome deve ter pelo menos 2 caracteres"),
   tipoChamada: z.enum([TipoChamada.NORMAL, TipoChamada.URGENTE]),
 });
 
@@ -50,9 +50,9 @@ export const schemaNovoAtendimento = z.object({
 // Derivados dos schemas Zod para não duplicar definições.
 // ================================================================
 
-export type FormCadastroPaciente = z.infer<typeof schemaCadastroPaciente>;
+export type FormCadastroProfissional = z.infer<typeof schemaCadastroProfissional>;
 export type FormLoginEmail = z.infer<typeof schemaLoginEmail>;
-export type FormNovoAtendimento = z.infer<typeof schemaNovoAtendimento>;
+export type FormEntradaKiosk = z.infer<typeof schemaEntradaKiosk>;
 
 export type TipoChamadaValue = (typeof TipoChamada)[keyof typeof TipoChamada];
 export type StatusAtendimentoValue = (typeof StatusAtendimento)[keyof typeof StatusAtendimento];
@@ -65,11 +65,7 @@ export type RoleValue = (typeof Role)[keyof typeof Role];
 
 export type AtendimentoNaFila = {
   id: string;
-  pacienteId: string;
-  paciente: {
-    id: string;
-    name: string;
-  };
+  nomePaciente: string;
   tipoChamada: TipoChamadaValue;
   status: StatusAtendimentoValue;
   criadoEm: Date;
