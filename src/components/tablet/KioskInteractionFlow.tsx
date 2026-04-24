@@ -70,7 +70,7 @@ export function KioskInteractionFlow({ handleToggleTalking }: KioskInteractionFl
     switch (step) {
       case "HOME":
         falar(
-          "Olá! Bem-vindo. Escolha entre avisar sua chegada ou solicitar a presença urgente de um profissional.",
+          "Olá! Bem-vindo. Meu nome é Rê! Escolha entre avisar sua chegada ou solicitar a presença urgente de um profissional.",
           onStart,
           onEnd
         );
@@ -239,7 +239,7 @@ export function KioskInteractionFlow({ handleToggleTalking }: KioskInteractionFl
             transition={{ duration: 0.4, ease: "easeOut" }}
             className="pointer-events-auto flex h-full w-full flex-col items-center justify-center"
           >
-            <div className="relative mx-auto flex w-full max-w-sm flex-col gap-4 rounded-3xl border border-emerald-500/30 bg-emerald-950/20 p-6 pb-8 text-center backdrop-blur-sm">
+            <div className="relative mx-auto flex w-full max-w-md flex-col gap-4 rounded-3xl border border-emerald-500/30 bg-emerald-950/20 p-6 pb-8 text-center backdrop-blur-sm">
               <div className="mt-2 mb-4 flex justify-center">
                 <motion.div
                   initial={{ scale: 0, rotate: -45 }}

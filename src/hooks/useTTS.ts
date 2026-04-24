@@ -37,7 +37,7 @@ export function useTTS() {
       const utterance = new SpeechSynthesisUtterance(texto);
       utterance.lang = "pt-BR";
       utterance.rate = 0.92;
-      utterance.pitch = 1;
+      utterance.pitch = 1.2;
       utterance.volume = 1;
       utterance.onend = () => onEnd();
       utterance.onstart = () => onStart();
