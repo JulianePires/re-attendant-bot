@@ -7,8 +7,8 @@ import { APP_ROUTES } from "./lib/constants";
  * Valida sessão via BetterAuth e protege rotas admin
  *
  * Proteções implementadas:
- * - /painel/usuarios/novo - Apenas admin
- * - /painel/* - Autenticado
+ * - /adm/usuarios/novo - Apenas admin
+ * - /adm/* - Autenticado
  * - /esqueci-a-senha, /redefinir-senha - Apenas não autenticado
  */
 
@@ -46,6 +46,11 @@ function matchRoute(pathname: string, route: string) {
 export async function proxy(request: NextRequest) {
   const pathname = request.nextUrl.pathname;
 
+  if (pathname === "/painel" || pathname.startsWith("/painel/")) {
+    const destino = pathname.replace(/^\/painel/, "/adm");
+    return NextResponse.redirect(new URL(destino, request.url));
+  }
+
   // Rotas totalmente públicas (sem verificação de sessão)
   if (FULLY_PUBLIC_ROUTES.some((route) => matchRoute(pathname, route))) {
     return NextResponse.next();
@@ -74,7 +79,7 @@ export async function proxy(request: NextRequest) {
 
   // Rotas PROTECTED (requer autenticação)
   if (PROTECTED_ROUTES.some((route) => matchRoute(pathname, route))) {
-    // Exceção: login é público mesmo dentro de /painel
+    // Exceção: login é público mesmo dentro de /adm
     if (pathname === APP_ROUTES.LOGIN) {
       if (isAuthenticated) {
         // Se já autenticado, redireciona para dashboard
@@ -83,7 +88,7 @@ export async function proxy(request: NextRequest) {
       return NextResponse.next();
     }
 
-    // Outras rotas /painel/* requerem autenticação
+    // Outras rotas /adm/* requerem autenticação
     if (!isAuthenticated) {
       return NextResponse.redirect(new URL(APP_ROUTES.LOGIN, request.url));
     }
@@ -106,7 +111,8 @@ export async function proxy(request: NextRequest) {
  */
 export const config = {
   matcher: [
-    // Protege rotas do painel e auth
+    // Protege rotas do admin e mantém compatibilidade com URLs legadas
+    "/adm/:path*",
     "/painel/:path*",
     "/esqueci-a-senha",
     "/redefinir-senha",

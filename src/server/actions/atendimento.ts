@@ -124,7 +124,7 @@ export async function finalizarAtendimento(atendimentoId: string) {
 /**
  * AÇÃO PÚBLICA PARA FINALIZAR ATENDIMENTOS
  * Permite finalizar atendimentos sem verificação de sessão
- * Utilizada pela tela pública /publico/atendimentos
+ * Utilizada pela tela pública /recepcao
  */
 export async function finalizarAtendimentoPublico(atendimentoId: string) {
   try {

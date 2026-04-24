@@ -87,7 +87,7 @@ function ResetPasswordContent() {
 
       // Redireciona para o login após sucesso
       setTimeout(() => {
-        router.push("/painel/login");
+        router.push("/adm/login");
       }, 2000);
     } catch (error) {
       console.error("[resetPassword]", error);
@@ -219,7 +219,7 @@ function ResetPasswordContent() {
             <Button
               type="button"
               variant="ghost"
-              onClick={() => router.push("/painel/login")}
+              onClick={() => router.push("/adm/login")}
               className="w-full text-zinc-400 hover:text-zinc-200"
             >
               <ArrowLeft className="mr-2 h-4 w-4" />

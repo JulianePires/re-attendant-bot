@@ -36,11 +36,11 @@ export default function Forbidden() {
         {/* Botões de ação */}
         <div className="flex justify-center gap-4">
           <Button
-            onClick={() => router.push("/painel")}
+            onClick={() => router.push("/adm")}
             className="flex items-center gap-2 rounded-lg bg-zinc-800 px-6 py-2 text-white transition-colors hover:bg-zinc-700"
           >
             <Home className="h-4 w-4" />
-            Voltar ao Painel
+            Voltar ao Admin
           </Button>
 
           <Button

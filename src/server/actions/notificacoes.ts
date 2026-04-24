@@ -79,7 +79,7 @@ export async function marcarComoLida(id: string) {
     throw new Error("Notificação não encontrada para este usuário.");
   }
 
-  revalidatePath("/painel");
+  revalidatePath("/adm");
 
   return { sucesso: true };
 }
@@ -103,7 +103,7 @@ export async function marcarTodasComoLidas() {
     },
   });
 
-  revalidatePath("/painel");
+  revalidatePath("/adm");
 
   return { atualizadas: resultado.count };
 }

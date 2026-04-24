@@ -55,7 +55,7 @@ export default function ForgetPasswordPage() {
 
       // Redireciona após sucesso
       setTimeout(() => {
-        router.push("/painel/login");
+        router.push("/adm/login");
       }, 2000);
     } catch (error) {
       console.error("[forgetPassword]", error);

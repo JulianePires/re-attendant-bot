@@ -7,10 +7,10 @@ import { motion } from "framer-motion";
 import { cn } from "@/lib/utils";
 
 const navItems = [
-  { href: "/painel", icon: Home, label: "Início" },
-  { href: "/painel/historico", icon: Clock, label: "Histórico" },
-  { href: "/painel/equipe", icon: Users, label: "Gerenciamento" },
-  { href: "/painel/usuarios", icon: UserCircle, label: "Usuários" },
+  { href: "/adm", icon: Home, label: "Início" },
+  { href: "/adm/historico", icon: Clock, label: "Histórico" },
+  { href: "/adm/equipe", icon: Users, label: "Gerenciamento" },
+  { href: "/adm/usuarios", icon: UserCircle, label: "Usuários" },
 ] as const;
 
 export function BottomNav() {

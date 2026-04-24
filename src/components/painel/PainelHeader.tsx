@@ -41,7 +41,7 @@ export function PainelHeader({ onFullscreenToggle, isFullscreen = false }: Paine
               </div>
               <div>
                 <h1 className="text-lg font-bold text-slate-100">Atendimentos</h1>
-                <p className="text-xs text-slate-400">Painel de Controle</p>
+                <p className="text-xs text-slate-400">Administração</p>
               </div>
             </div>
 

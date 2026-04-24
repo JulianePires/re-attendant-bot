@@ -158,12 +158,7 @@ export default function PainelDashboardPage() {
       {/* Two Column Layout */}
       <div className="grid grid-cols-1 gap-6 lg:grid-cols-2">
         {/* Coluna 1: Pacientes Normais */}
-        <ColumnSection
-          title="Atendimento Normal"
-          icon={Users}
-          count={pacientesNormais.length}
-          variant="normal"
-        >
+        <ColumnSection title="Atendimento Normal" icon={Users} variant="normal">
           <AnimatePresence mode="popLayout">
             {pacientesNormais.length === 0 ? (
               <EmptyState message="Nenhum paciente aguardando" />
@@ -183,12 +178,7 @@ export default function PainelDashboardPage() {
         </ColumnSection>
 
         {/* Coluna 2: Pacientes Urgentes */}
-        <ColumnSection
-          title="Chamadas Urgentes"
-          icon={AlertCircle}
-          count={pacientesUrgentes.length}
-          variant="urgente"
-        >
+        <ColumnSection title="Chamadas Urgentes" icon={AlertCircle} variant="urgente">
           <AnimatePresence mode="popLayout">
             {pacientesUrgentes.length === 0 ? (
               <EmptyState message="Nenhuma urgência no momento" variant="urgente" />
@@ -225,13 +215,11 @@ export default function PainelDashboardPage() {
 function ColumnSection({
   title,
   icon: Icon,
-  count,
   variant,
   children,
 }: {
   title: string;
   icon: React.ElementType;
-  count: number;
   variant: "normal" | "urgente";
   children: React.ReactNode;
 }) {
@@ -251,16 +239,6 @@ function ColumnSection({
           </div>
           <h2 className="text-lg font-semibold text-slate-100">{title}</h2>
         </div>
-        <span
-          className={cn(
-            "flex h-7 min-w-7 items-center justify-center rounded-full px-2.5 text-xs font-bold",
-            isUrgente
-              ? "bg-red-500/20 text-red-400 ring-1 ring-red-500/30"
-              : "bg-violet-500/20 text-violet-400"
-          )}
-        >
-          {count}
-        </span>
       </div>
 
       <div className="space-y-3">{children}</div>

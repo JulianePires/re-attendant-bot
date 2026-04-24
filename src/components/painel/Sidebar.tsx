@@ -39,17 +39,17 @@ export function Sidebar() {
         <div className="bg-primary flex h-8 w-8 items-center justify-center rounded-lg">
           <Stethoscope className="text-primary-foreground h-4 w-4" aria-hidden="true" />
         </div>
-        <span className="text-foreground text-sm font-semibold">Clínica Painel</span>
+        <span className="text-foreground text-sm font-semibold">Clínica Admin</span>
       </div>
 
       {/* Navegação principal */}
       <nav
         className="flex-1 space-y-0.5 overflow-y-auto px-3 py-4"
-        aria-label="Navegacao do painel"
+        aria-label="Navegacao do admin"
       >
         {itensNav.map(({ href, label, icone: Icone }) => {
-          // Correspondência exata para /painel evita que Dashboard
-          // fique ativo em todas as sub-rotas do painel
+          // Correspondência exata para a rota base evita que Dashboard
+          // fique ativo em todas as sub-rotas do admin
           const ativo =
             href === APP_ROUTES.DASHBOARD ? pathname === href : pathname.startsWith(href);
 
