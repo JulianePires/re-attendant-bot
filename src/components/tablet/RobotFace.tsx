@@ -3,6 +3,7 @@
 import { motion } from "framer-motion";
 import { useEffect, useState } from "react";
 import { LottieHandler } from "@/components/common/atoms/LottieHandler";
+import Image from "next/image";
 
 /**
  * Hook para gerenciar animações do rosto do robô
@@ -112,17 +113,11 @@ export function RobotEyebrow({ position, side }: RobotEyebrowProps) {
         damping: 15,
       }}
     >
-      <div
-        className={`h-5 w-56 bg-slate-600 shadow-md ${
-          side === "left" ? "-rotate-22" : "rotate-22"
-        }`}
-        style={{
-          borderRadius:
-            side === "left"
-              ? "50% 50% 60% 40% / 80% 80% 20% 20%"
-              : "50% 50% 40% 60% / 80% 80% 20% 20%",
-        }}
-      />
+      {side === "left" ? (
+        <Image src="/images/left-eyebrow.png" alt="Sobrancelha Esquerda" width={450} height={40} />
+      ) : (
+        <Image src="/images/right-eyebrow.png" alt="Sobrancelha Direita" width={450} height={40} />
+      )}
     </motion.div>
   );
 }
