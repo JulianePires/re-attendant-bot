@@ -102,7 +102,6 @@ export function KioskInteractionFlow({ handleToggleTalking }: KioskInteractionFl
         nome: nome.trim(),
         tipoChamada,
       });
-      toast.success("Entrada na fila registrada com sucesso.");
       setStep("SUCCESS");
       setTimeout(() => resetFlow(), 10000);
     } catch {
