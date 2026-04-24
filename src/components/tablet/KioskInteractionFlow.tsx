@@ -70,7 +70,7 @@ export function KioskInteractionFlow({ handleToggleTalking }: KioskInteractionFl
     switch (step) {
       case "HOME":
         falar(
-          "Olá! Bem-vindo. Escolha entre entrar na fila de atendimento ou solicitar a presença de um profissional.",
+          "Olá! Bem-vindo. Escolha entre avisar sua chegada ou solicitar a presença urgente de um profissional.",
           onStart,
           onEnd
         );
@@ -79,11 +79,15 @@ export function KioskInteractionFlow({ handleToggleTalking }: KioskInteractionFl
         falar("Digite seu nome e confirme.", onStart, onEnd);
         break;
       case "SUCCESS":
-        falar("Tudo certo! Aguarde que logo você será chamado.", onStart, onEnd);
+        falar(
+          `Tudo certo! Aguarde que logo ${tipoChamada === "urgente" ? "um profissional chegará" : "chamaremos seu nome"}.`,
+          onStart,
+          onEnd
+        );
         break;
     }
     // eslint-disable-next-line react-hooks/exhaustive-deps
-  }, [step]);
+  }, [step, tipoChamada]);
 
   const handleAction = async () => {
     if (isSubmitting) return;
@@ -181,7 +185,7 @@ export function KioskInteractionFlow({ handleToggleTalking }: KioskInteractionFl
               initial={{ opacity: 0 }}
               animate={{ opacity: 1 }}
               onClick={resetFlow}
-              className="absolute top-8 left-8 z-50 flex items-center gap-2 rounded-2xl px-5 py-3 text-lg font-medium text-zinc-400 shadow-lg transition-all duration-300 hover:bg-zinc-800/80 hover:text-zinc-100 hover:shadow-xl active:scale-95"
+              className="text-md absolute top-8 left-8 z-50 flex items-center gap-2 rounded-2xl px-5 py-3 font-medium text-zinc-100 shadow-lg transition-all duration-300 hover:bg-zinc-800/80 hover:text-zinc-100 hover:shadow-xl active:scale-95"
             >
               <ArrowLeft className="h-6 w-6" /> Voltar ao Início
             </motion.button>
@@ -213,10 +217,13 @@ export function KioskInteractionFlow({ handleToggleTalking }: KioskInteractionFl
               >
                 {isSubmitting ? (
                   <span className="flex items-center gap-2 text-base font-medium">
-                    <Loader2 className="h-5 w-5 animate-spin" /> Adicionando à fila...
+                    <Loader2 className="h-5 w-5 animate-spin" />{" "}
+                    {tipoChamada === "urgente" ? "Solicitando ajuda..." : "Registrando chegada..."}
                   </span>
+                ) : tipoChamada === "urgente" ? (
+                  "Solicitar Ajuda Urgente"
                 ) : (
-                  "Avisar minha chegada!"
+                  "Confirmar Chegada"
                 )}
               </button>
             </div>
@@ -256,7 +263,8 @@ export function KioskInteractionFlow({ handleToggleTalking }: KioskInteractionFl
               <p className="mx-auto mt-2 max-w-sm text-base leading-relaxed text-emerald-100/70">
                 Sua chegada está confirmada.
                 <br />
-                Por favor, aguarde na recepção que logo chamaremos seu nome.
+                Por favor, aguarde que logo{" "}
+                {tipoChamada === "urgente" ? "um profissional chegará" : "chamaremos seu nome"}.
               </p>
             </div>
           </motion.div>

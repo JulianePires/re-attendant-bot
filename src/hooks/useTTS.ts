@@ -21,7 +21,9 @@ export function useTTS() {
   const resolverVoz = useCallback((): SpeechSynthesisVoice | null => {
     const vozes = window.speechSynthesis.getVoices();
     return (
-      vozes.find((v) => v.lang === "pt-BR") ?? vozes.find((v) => v.lang.startsWith("pt")) ?? null
+      vozes.find((v) => v.lang === "pt-BR" && v.name.includes("Maria")) ??
+      vozes.find((v) => v.lang.startsWith("pt")) ??
+      null
     );
   }, []);
 
@@ -35,7 +37,7 @@ export function useTTS() {
       const utterance = new SpeechSynthesisUtterance(texto);
       utterance.lang = "pt-BR";
       utterance.rate = 0.92;
-      utterance.pitch = 0.8;
+      utterance.pitch = 1;
       utterance.volume = 1;
       utterance.onend = () => onEnd();
       utterance.onstart = () => onStart();
