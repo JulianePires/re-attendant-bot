@@ -1,9 +1,10 @@
 "use client";
 
-import { useState } from "react";
+import { useEffect, useState } from "react";
 import { motion } from "framer-motion";
 import { RobotFaceContainer } from "@/components/tablet/RobotFaceContainer";
 import { KioskInteractionFlow } from "@/components/tablet/KioskInteractionFlow";
+import { Maximize, Minimize } from "lucide-react";
 
 /**
  * Tela principal do Totem de Autoatendimento
@@ -13,38 +14,32 @@ import { KioskInteractionFlow } from "@/components/tablet/KioskInteractionFlow";
  */
 export default function TabletPage() {
   const [isTalking, setIsTalking] = useState(false);
+  const [isFullscreen, setIsFullscreen] = useState(false);
+
+  // Listen for fullscreen changes
+  useEffect(() => {
+    const handleFullscreenChange = () => {
+      setIsFullscreen(!!document.fullscreenElement);
+    };
+
+    document.addEventListener("fullscreenchange", handleFullscreenChange);
+    return () => document.removeEventListener("fullscreenchange", handleFullscreenChange);
+  }, []);
+
+  const toggleFullscreen = () => {
+    if (!document.fullscreenElement) {
+      document.documentElement.requestFullscreen().then(() => {
+        setIsFullscreen(true);
+      });
+    } else {
+      document.exitFullscreen().then(() => {
+        setIsFullscreen(false);
+      });
+    }
+  };
 
   return (
-    <div className="bg-gradient-radial relative h-screen w-screen overflow-hidden from-slate-100 via-slate-50 to-white">
-      {/* Elementos decorativos de fundo */}
-      <div className="pointer-events-none absolute inset-0">
-        <motion.div
-          className="absolute top-10 left-10 h-32 w-32 rounded-full bg-blue-200/20 blur-3xl"
-          animate={{
-            scale: [1, 1.2, 1],
-            opacity: [0.3, 0.5, 0.3],
-          }}
-          transition={{
-            repeat: Infinity,
-            duration: 8,
-            ease: "easeInOut",
-          }}
-        />
-        <motion.div
-          className="absolute right-10 bottom-10 h-40 w-40 rounded-full bg-violet-200/20 blur-3xl"
-          animate={{
-            scale: [1.2, 1, 1.2],
-            opacity: [0.3, 0.5, 0.3],
-          }}
-          transition={{
-            repeat: Infinity,
-            duration: 10,
-            ease: "easeInOut",
-            delay: 2,
-          }}
-        />
-      </div>
-
+    <div className="relative h-screen w-screen overflow-hidden bg-linear-125 from-sky-500 via-sky-400 to-sky-600">
       {/* Rosto do Robô - Centralizado */}
       <motion.div
         className="absolute inset-0 flex items-center justify-center"
@@ -59,19 +54,15 @@ export default function TabletPage() {
       <KioskInteractionFlow handleToggleTalking={setIsTalking} />
 
       {/* Indicador de status no canto superior direito */}
-      <div className="absolute top-6 right-6 flex items-center gap-2 rounded-full bg-white/80 px-4 py-2 shadow-lg backdrop-blur-sm">
-        <motion.div
-          className="h-3 w-3 rounded-full bg-emerald-500"
-          animate={{
-            scale: [1, 1.3, 1],
-            opacity: [1, 0.7, 1],
-          }}
-          transition={{
-            repeat: Infinity,
-            duration: 2,
-          }}
-        />
-        <span className="text-sm font-medium text-slate-700">Sistema Online</span>
+      <div className="absolute top-6 right-6 flex items-center gap-2">
+        {/* Fullscreen Toggle */}
+        <button
+          onClick={toggleFullscreen}
+          className="group relative flex h-10 w-10 items-center justify-center rounded-lg border border-slate-800 bg-slate-900/50 text-slate-400 transition-all hover:border-violet-500/50 hover:bg-slate-800 hover:text-violet-400 hover:shadow-[0_0_15px_rgba(139,92,246,0.2)]"
+          aria-label={isFullscreen ? "Sair da tela cheia" : "Tela cheia"}
+        >
+          {isFullscreen ? <Minimize className="h-5 w-5" /> : <Maximize className="h-5 w-5" />}
+        </button>
       </div>
     </div>
   );

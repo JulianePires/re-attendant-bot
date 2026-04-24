@@ -15,9 +15,11 @@ export function RobotFaceContainer({ isTalking = false }: RobotFaceContainerProp
   const { eyePosition, isBlinking } = useRobotFaceAnimation();
 
   return (
-    <div className="relative flex flex-col items-center justify-center">
-      {/* Container dos olhos e sobrancelhas */}
-      <div className="relative mt-20 mb-32 flex items-center gap-48">
+    <div className="relative flex flex-col items-center justify-center px-24 pt-16 pb-16">
+      {/* ── Conteúdo do rosto ── */}
+
+      {/* Olhos e sobrancelhas */}
+      <div className="relative mt-20 flex items-center gap-48">
         {/* Olho Esquerdo com Sobrancelha */}
         <div className="relative">
           <RobotEyebrow position={eyePosition} side="left" />
@@ -31,37 +33,34 @@ export function RobotFaceContainer({ isTalking = false }: RobotFaceContainerProp
         </div>
       </div>
 
+      {/* Bochechas rosadas */}
+      <motion.div
+        className="pointer-events-none absolute h-28 w-28 rounded-full"
+        style={{
+          bottom: "22%",
+          left: "10%",
+          background: "radial-gradient(circle, rgba(251,113,133,0.28) 0%, transparent 70%)",
+          filter: "blur(12px)",
+        }}
+        animate={{ opacity: [0.7, 1, 0.7] }}
+        transition={{ repeat: Infinity, duration: 3, ease: "easeInOut" }}
+      />
+      <motion.div
+        className="pointer-events-none absolute h-28 w-28 rounded-full"
+        style={{
+          bottom: "22%",
+          right: "10%",
+          background: "radial-gradient(circle, rgba(251,113,133,0.28) 0%, transparent 70%)",
+          filter: "blur(12px)",
+        }}
+        animate={{ opacity: [0.7, 1, 0.7] }}
+        transition={{ repeat: Infinity, duration: 3, ease: "easeInOut", delay: 0.5 }}
+      />
+
       {/* Boca */}
-      <div className="mt-16">
+      <div className="mt-4">
         <RobotMouth isTalking={isTalking} />
       </div>
-
-      {/* Decorações adicionais - Círculos de "bochecha" */}
-      <motion.div
-        className="absolute top-64 left-40 h-12 w-12 rounded-full bg-pink-300/40"
-        animate={{
-          scale: [1, 1.2, 1],
-          opacity: [0.4, 0.6, 0.4],
-        }}
-        transition={{
-          repeat: Infinity,
-          duration: 3,
-          ease: "easeInOut",
-        }}
-      />
-      <motion.div
-        className="absolute top-64 right-40 h-12 w-12 rounded-full bg-pink-300/40"
-        animate={{
-          scale: [1, 1.2, 1],
-          opacity: [0.4, 0.6, 0.4],
-        }}
-        transition={{
-          repeat: Infinity,
-          duration: 3,
-          ease: "easeInOut",
-          delay: 1.5,
-        }}
-      />
     </div>
   );
 }

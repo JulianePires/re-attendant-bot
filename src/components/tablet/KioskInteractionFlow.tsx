@@ -129,7 +129,7 @@ export function KioskInteractionFlow({ handleToggleTalking }: KioskInteractionFl
             <button
               type="button"
               onClick={handleStart}
-              className="flex items-center gap-3 rounded-full border border-violet-500/50 bg-violet-600/20 px-10 py-4 text-lg font-bold text-violet-100 shadow-[0_0_30px_rgba(124,58,237,0.15)] backdrop-blur-sm transition-all hover:bg-violet-600/30 hover:shadow-[0_0_40px_rgba(124,58,237,0.25)] active:scale-95"
+              className="flex items-center gap-3 rounded-full border border-violet-500 bg-violet-600 px-10 py-4 text-lg font-bold text-violet-100 shadow-[0_0_30px_rgba(124,58,237,0.15)] backdrop-blur-sm transition-all hover:bg-violet-600/30 hover:shadow-[0_0_40px_rgba(124,58,237,0.25)] active:scale-95"
             >
               <Play className="h-5 w-5 fill-current" />
               Toque para iniciar
@@ -150,20 +150,20 @@ export function KioskInteractionFlow({ handleToggleTalking }: KioskInteractionFl
             <button
               type="button"
               onClick={() => handleChooseOption("urgente")}
-              className={`${BTN_BASE} border border-red-500/40 bg-red-500/10 text-red-200 hover:bg-red-500/20`}
+              className={`${BTN_BASE} border border-red-500 bg-red-500 text-red-200 hover:bg-red-500/20`}
             >
               Avisar Urgente.
-              <span className="text-[16px] font-medium text-zinc-400">Falar com alguém!</span>
+              <span className="text-[16px] font-medium text-zinc-100">Falar com alguém!</span>
             </button>
 
             {/* Botão NORMAL — Direito */}
             <button
               type="button"
               onClick={() => handleChooseOption("normal")}
-              className={`${BTN_BASE} border border-violet-500/40 bg-violet-500/10 text-violet-200 hover:bg-violet-500/20`}
+              className={`${BTN_BASE} border border-violet-500 bg-violet-500 text-violet-200 hover:bg-violet-500/20`}
             >
               Avisar minha chegada!
-              <span className="text-[16px] font-medium text-zinc-400">Pacientes agendados.</span>
+              <span className="text-[16px] font-medium text-zinc-100">Pacientes agendados.</span>
             </button>
           </motion.div>
         )}
@@ -186,7 +186,7 @@ export function KioskInteractionFlow({ handleToggleTalking }: KioskInteractionFl
               <ArrowLeft className="h-6 w-6" /> Voltar ao Início
             </motion.button>
 
-            <div className="relative mx-auto flex w-full max-w-xl flex-col gap-4 rounded-3xl border border-zinc-800/60 bg-zinc-950/80 p-6 backdrop-blur-sm">
+            <div className="relative mx-auto flex w-full max-w-xl flex-col gap-4 rounded-3xl border border-sky-800/60 bg-sky-950/80 p-6 backdrop-blur-sm">
               <div className="mb-4 text-center">
                 <h2 className="text-2xl font-bold tracking-tight text-white">
                   Identificação rápida
@@ -200,7 +200,7 @@ export function KioskInteractionFlow({ handleToggleTalking }: KioskInteractionFl
                   autoFocus
                   value={nome}
                   onChange={(e) => setNome(e.target.value)}
-                  className="w-full rounded-xl border border-zinc-800 bg-zinc-900 px-5 py-5 text-center text-3xl text-zinc-100 transition-all placeholder:text-zinc-700 focus:border-violet-500 focus:shadow-[0_0_20px_rgba(124,58,237,0.2)] focus:outline-none"
+                  className="w-full rounded-xl border border-sky-800 bg-sky-950 px-5 py-5 text-center text-3xl text-white transition-all placeholder:text-sky-700 focus:border-violet-500 focus:shadow-[0_0_20px_rgba(124,58,237,0.2)] focus:outline-none"
                   placeholder="Digite seu nome"
                   autoComplete="off"
                 />

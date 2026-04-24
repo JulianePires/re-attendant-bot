@@ -58,31 +58,62 @@ export function RobotEye({ position, isBlinking }: RobotEyeProps) {
       }}
       transition={{ duration: 0.1 }}
     >
-      {/* Esclera (parte branca) */}
-      <div className="relative h-64 w-64 overflow-hidden rounded-full bg-white shadow-[inset_0_4px_16px_rgba(0,0,0,0.1),0_8px_32px_rgba(0,0,0,0.15)]">
-        {/* Pupila animada */}
-        <motion.div
-          className="absolute inset-0 flex items-center justify-center"
-          animate={{
-            x: position.x,
-            y: position.y,
-          }}
-          transition={{
-            type: "spring",
-            stiffness: 60,
-            damping: 15,
+      {/* Anel externo — encaixe na face */}
+      <div
+        className="relative rounded-full p-[5px]"
+        style={{
+          background: "linear-gradient(145deg, rgba(0,0,0,0.08) 0%, rgba(0,0,0,0.18) 100%)",
+          boxShadow:
+            "0 12px_40px rgba(0,0,0,0.18), 0 4px 12px rgba(0,0,0,0.12), inset 0 2px 4px rgba(255, 255, 255, 0.5)",
+        }}
+      >
+        {/* Esclera (parte branca) */}
+        <div
+          className="relative h-48 w-48 overflow-hidden rounded-full bg-white"
+          style={{
+            boxShadow:
+              "inset 0 6px 18px rgba(0,0,0,0.12), inset 0 -4px 10px rgba(0,0,0,0.06), inset 4px 0 10px rgba(0,0,0,0.04)",
           }}
         >
-          <div className="relative">
-            {/* Íris azul */}
-            <div className="relative h-32 w-32 rounded-full bg-linear-to-br from-blue-400 to-blue-600 shadow-lg">
-              {/* Pupila */}
-              <div className="absolute top-1/2 left-1/2 h-16 w-16 -translate-x-1/2 -translate-y-1/2 rounded-full bg-zinc-900" />
-              {/* Reflexo */}
-              <div className="absolute top-6 left-8 h-6 w-6 rounded-full bg-white/60" />
+          {/* Pupila animada */}
+          <motion.div
+            className="absolute inset-0 flex items-center justify-center"
+            animate={{
+              x: position.x,
+              y: position.y,
+            }}
+            transition={{
+              type: "spring",
+              stiffness: 60,
+              damping: 15,
+            }}
+          >
+            <div className="relative">
+              {/* Íris azul */}
+              <div
+                className="relative h-32 w-32 rounded-full"
+                style={{
+                  background: "radial-gradient(circle at 35% 35%, #60a5fa, #1d4ed8)",
+                  boxShadow:
+                    "0 4px 16px rgba(29,78,216,0.5), inset 0 2px 4px rgba(255,255,255,0.3)",
+                }}
+              >
+                {/* Pupila */}
+                <div
+                  className="absolute top-1/2 left-1/2 h-16 w-16 -translate-x-1/2 -translate-y-1/2 rounded-full bg-zinc-900"
+                  style={{ boxShadow: "inset 0 2px 6px rgba(0,0,0,0.6)" }}
+                />
+                {/* Reflexo principal */}
+                <div
+                  className="absolute top-5 left-7 h-7 w-7 rounded-full bg-white/70"
+                  style={{ filter: "blur(1px)" }}
+                />
+                {/* Reflexo secundário pequeno */}
+                <div className="absolute top-9 left-14 h-3 w-3 rounded-full bg-white/40" />
+              </div>
             </div>
-          </div>
-        </motion.div>
+          </motion.div>
+        </div>
       </div>
     </motion.div>
   );
@@ -114,9 +145,21 @@ export function RobotEyebrow({ position, side }: RobotEyebrowProps) {
       }}
     >
       {side === "left" ? (
-        <Image src="/images/left-eyebrow.png" alt="Sobrancelha Esquerda" width={450} height={40} />
+        <Image
+          loading="eager"
+          src="/images/left-eyebrow.png"
+          alt="Sobrancelha Esquerda"
+          width={500}
+          height={40}
+        />
       ) : (
-        <Image src="/images/right-eyebrow.png" alt="Sobrancelha Direita" width={450} height={40} />
+        <Image
+          loading="eager"
+          src="/images/right-eyebrow.png"
+          alt="Sobrancelha Direita"
+          width={500}
+          height={40}
+        />
       )}
     </motion.div>
   );
@@ -165,7 +208,7 @@ export function RobotMouth({ isTalking = false }: RobotMouthProps) {
       <LottieHandler
         animationName="standy-mouth"
         loop
-        className="h-64 w-lg"
+        className="h-84 w-lg"
         style={{ filter: "drop-shadow(0 4px 8px rgba(0, 0, 0, 0.1))" }}
       />
     </motion.div>

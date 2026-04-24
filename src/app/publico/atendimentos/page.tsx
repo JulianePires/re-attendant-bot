@@ -1,28 +1,85 @@
 "use client";
 
 import { motion, AnimatePresence } from "framer-motion";
-import { Users, AlertCircle, Inbox } from "lucide-react";
+import { Users, AlertCircle, Inbox, Clock, Maximize, Minimize } from "lucide-react";
 import { useQuery } from "@tanstack/react-query";
 import { FILA_PUBLICA_QUERY_KEY, useRealtimeQueuePublic } from "@/hooks/useRealtimeQueuePublic";
+import { useCampainha } from "@/hooks/useCampainha";
 import { obterFilaPublica } from "@/server/actions/atendimento";
 import type { AtendimentoNaFila } from "@/types";
 import { cn } from "@/lib/utils";
+import { calcularTempoEspera } from "@/lib/utils/funcoes";
+import { useState, useEffect, useRef } from "react";
 
 /**
  * Tela Pública de Atendimentos — READ-ONLY
  * Exibe a fila em tempo real sem permitir ações de conclusão.
  */
 export default function PublicoAtendimentosPage() {
+  const [isFullscreen, setIsFullscreen] = useState(false);
+  const { tocarAlertaUrgente, tocarNotificacao } = useCampainha();
+
+  // Listen for fullscreen changes
+  useEffect(() => {
+    const handleFullscreenChange = () => {
+      setIsFullscreen(!!document.fullscreenElement);
+    };
+
+    document.addEventListener("fullscreenchange", handleFullscreenChange);
+    return () => document.removeEventListener("fullscreenchange", handleFullscreenChange);
+  }, []);
+
+  const toggleFullscreen = () => {
+    if (!document.fullscreenElement) {
+      document.documentElement.requestFullscreen().then(() => {
+        setIsFullscreen(true);
+      });
+    } else {
+      document.exitFullscreen().then(() => {
+        setIsFullscreen(false);
+      });
+    }
+  };
+
   // Query da fila ativa
   const { data: filaAtiva = [], isError } = useQuery({
     queryKey: FILA_PUBLICA_QUERY_KEY,
     queryFn: obterFilaPublica,
     staleTime: 0,
-    refetchInterval: 30000,
+    refetchInterval: 10000,
   });
 
   // Realtime updates
   useRealtimeQueuePublic();
+
+  // Detecta novos pacientes comparando com snapshot anterior.
+  // Usa os dados completos da API (não o payload parcial do realtime),
+  // garantindo que tipoChamada seja sempre reconhecido mesmo com RLS ativo.
+  const prevFilaRef = useRef<AtendimentoNaFila[] | null>(null);
+  useEffect(() => {
+    // Ignora a carga inicial para não tocar som ao montar a tela.
+    if (prevFilaRef.current === null) {
+      prevFilaRef.current = filaAtiva;
+      return undefined;
+    }
+
+    const prevIds = new Set(prevFilaRef.current.map((a) => a.id));
+    const novos = filaAtiva.filter((a) => !prevIds.has(a.id));
+
+    for (const novo of novos) {
+      if (novo.tipoChamada === "urgente") {
+        tocarAlertaUrgente();
+        break;
+      } else {
+        tocarNotificacao();
+        break;
+      }
+    }
+
+    prevFilaRef.current = filaAtiva;
+
+    return undefined;
+  }, [filaAtiva, tocarAlertaUrgente, tocarNotificacao]);
 
   // Separar por tipo
   const pacientesNormais = filaAtiva.filter((a) => a.tipoChamada === "normal");
@@ -63,6 +120,14 @@ export default function PublicoAtendimentosPage() {
               value={pacientesUrgentes.length}
               className="border-red-500/30 bg-red-500/10 text-red-400"
             />
+            {/* Fullscreen Toggle */}
+            <button
+              onClick={toggleFullscreen}
+              className="group relative flex h-10 w-10 items-center justify-center rounded-lg border border-slate-800 bg-slate-900/50 text-slate-400 transition-all hover:border-violet-500/50 hover:bg-slate-800 hover:text-violet-400 hover:shadow-[0_0_15px_rgba(139,92,246,0.2)]"
+              aria-label={isFullscreen ? "Sair da tela cheia" : "Tela cheia"}
+            >
+              {isFullscreen ? <Minimize className="h-5 w-5" /> : <Maximize className="h-5 w-5" />}
+            </button>
           </div>
         </div>
 
@@ -131,6 +196,7 @@ function AtendimentoReadOnlyCard({
   variant: "normal" | "urgente";
 }) {
   const isUrgente = variant === "urgente";
+  const tempoEspera = calcularTempoEspera(atendimento.criadoEm);
 
   return (
     <motion.div
@@ -155,6 +221,10 @@ function AtendimentoReadOnlyCard({
       <span className="flex-1 text-base font-semibold text-slate-100">
         {atendimento.nomePaciente}
       </span>
+      <div className="mt-1 flex items-center gap-2 text-xs text-slate-400">
+        <Clock className="h-3.5 w-3.5" />
+        <span>Aguardando {tempoEspera}</span>
+      </div>
     </motion.div>
   );
 }

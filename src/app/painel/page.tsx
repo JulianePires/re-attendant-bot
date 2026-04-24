@@ -6,17 +6,19 @@ import { Users, AlertCircle, Inbox, ExternalLink, Copy, Check } from "lucide-rea
 import { useQuery, useMutation, useQueryClient } from "@tanstack/react-query";
 import { toast } from "sonner";
 import { FILA_ATIVA_QUERY_KEY, useRealtimeQueue } from "@/hooks/useRealtimeQueue";
+import { useCampainha } from "@/hooks/useCampainha";
 import { finalizarAtendimento, obterFilaAtiva } from "@/server/actions/atendimento";
 import { marcarTodasComoLidas } from "@/server/actions/notificacoes";
 import { AtendimentoCard } from "@/components/painel/AtendimentoCard";
 import { ConfirmarFinalizacaoDialog } from "@/components/painel/ConfirmarFinalizacaoDialog";
 import type { AtendimentoNaFila } from "@/types";
-import { useEffect, useState } from "react";
+import { useEffect, useRef, useState } from "react";
 import { cn } from "@/lib/utils";
 import { APP_ROUTES } from "@/lib/constants";
 
 export default function PainelDashboardPage() {
   const queryClient = useQueryClient();
+  const { tocarAlertaUrgente, tocarNotificacao } = useCampainha();
   const [dialogAberto, setDialogAberto] = useState(false);
   const [atendimentoSelecionado, setAtendimentoSelecionado] = useState<{
     id: string;
@@ -40,6 +42,29 @@ export default function PainelDashboardPage() {
 
   // Realtime updates (sincronização automática via Supabase)
   useRealtimeQueue();
+
+  const prevFilaRef = useRef<AtendimentoNaFila[] | null>(null);
+  useEffect(() => {
+    if (prevFilaRef.current === null) {
+      prevFilaRef.current = filaAtiva;
+      return undefined;
+    }
+
+    const prevIds = new Set(prevFilaRef.current.map((item) => item.id));
+    const novos = filaAtiva.filter((item) => !prevIds.has(item.id));
+
+    for (const novo of novos) {
+      if (novo.tipoChamada === "urgente") {
+        tocarAlertaUrgente();
+      } else {
+        tocarNotificacao();
+      }
+    }
+
+    prevFilaRef.current = filaAtiva;
+
+    return undefined;
+  }, [filaAtiva, tocarAlertaUrgente, tocarNotificacao]);
 
   // Optimistic updates
   const [optimisticFila, setOptimisticFila] = useOptimistic<AtendimentoNaFila[], string>(

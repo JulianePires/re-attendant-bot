@@ -8,9 +8,7 @@ export function useCampainha() {
 
   const tocarAlertaUrgente = useCallback(() => {
     if (!alertaUrgenteRef.current) {
-      const audio = new Audio("/sounds/alerta.mp3");
-      audio.loop = true;
-      alertaUrgenteRef.current = audio;
+      alertaUrgenteRef.current = new Audio("/sounds/alerta.mp3");
     }
 
     alertaUrgenteRef.current.currentTime = 0;
