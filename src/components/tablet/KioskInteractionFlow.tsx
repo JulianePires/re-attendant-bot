@@ -133,7 +133,7 @@ export function KioskInteractionFlow({ handleToggleTalking }: KioskInteractionFl
             <button
               type="button"
               onClick={handleStart}
-              className="flex items-center gap-3 rounded-full border border-violet-500 bg-violet-600 px-10 py-4 text-lg font-bold text-violet-100 shadow-[0_0_30px_rgba(124,58,237,0.15)] backdrop-blur-sm transition-all hover:bg-violet-600/30 hover:shadow-[0_0_40px_rgba(124,58,237,0.25)] active:scale-95"
+              className="flex items-center gap-3 rounded-full border border-emerald-800 bg-emerald-600 px-10 py-4 text-lg font-bold text-emerald-100 shadow-[0_0_30px_rgba(124,58,237,0.15)] backdrop-blur-sm transition-all hover:bg-emerald-600/50 hover:shadow-[0_0_40px_rgba(124,58,237,0.25)] active:scale-95 cursor-pointer"
             >
               <Play className="h-5 w-5 fill-current" />
               Toque para iniciar
@@ -154,7 +154,7 @@ export function KioskInteractionFlow({ handleToggleTalking }: KioskInteractionFl
             <button
               type="button"
               onClick={() => handleChooseOption("urgente")}
-              className={`${BTN_BASE} border border-red-500 bg-red-500 text-red-200 hover:bg-red-500/20`}
+              className={`${BTN_BASE} border border-red-500 bg-red-500 text-red-200 hover:bg-red-500/50 cursor-pointer`}
             >
               Avisar Urgente.
               <span className="text-[16px] font-medium text-zinc-100">Falar com alguém!</span>
@@ -164,7 +164,7 @@ export function KioskInteractionFlow({ handleToggleTalking }: KioskInteractionFl
             <button
               type="button"
               onClick={() => handleChooseOption("normal")}
-              className={`${BTN_BASE} border border-violet-500 bg-violet-500 text-violet-200 hover:bg-violet-500/20`}
+              className={`${BTN_BASE} border border-emerald-500 bg-emerald-500 text-emerald-200 hover:bg-emerald-500/50 cursor-pointer`}
             >
               Avisar minha chegada!
               <span className="text-[16px] font-medium text-zinc-100">Pacientes agendados.</span>
@@ -204,7 +204,7 @@ export function KioskInteractionFlow({ handleToggleTalking }: KioskInteractionFl
                   autoFocus
                   value={nome}
                   onChange={(e) => setNome(e.target.value)}
-                  className="w-full rounded-xl border border-sky-800 bg-sky-950 px-5 py-5 text-center text-3xl text-white transition-all placeholder:text-sky-700 focus:border-violet-500 focus:shadow-[0_0_20px_rgba(124,58,237,0.2)] focus:outline-none"
+                  className="w-full rounded-xl border border-sky-800 bg-sky-950 px-5 py-5 text-center text-3xl text-white transition-all placeholder:text-sky-700 focus:border-emerald-500 focus:shadow-[0_0_20px_rgba(124,58,237,0.2)] focus:outline-none"
                   placeholder="Digite seu nome"
                   autoComplete="off"
                 />
@@ -213,7 +213,7 @@ export function KioskInteractionFlow({ handleToggleTalking }: KioskInteractionFl
               <button
                 onClick={handleAction}
                 disabled={isSubmitting}
-                className="mt-4 flex w-full items-center justify-center gap-3 rounded-xl bg-violet-600 py-4 text-lg font-bold text-white shadow-[0_0_20px_rgba(124,58,237,0.3)] transition-all hover:scale-[1.02] hover:bg-violet-500 active:scale-[0.98] disabled:opacity-50 disabled:hover:scale-100"
+                className="mt-4 flex w-full items-center justify-center gap-3 rounded-xl bg-emerald-600 py-4 text-lg font-bold text-white shadow-[0_0_20px_rgba(124,58,237,0.3)] transition-all hover:scale-[1.02] hover:bg-emerald-500 active:scale-[0.98] disabled:opacity-50 disabled:hover:scale-100"
               >
                 {isSubmitting ? (
                   <span className="flex items-center gap-2 text-base font-medium">
