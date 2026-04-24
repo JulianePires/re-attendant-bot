@@ -4,7 +4,7 @@ import { useState, useEffect, useRef } from "react";
 import { motion, AnimatePresence } from "framer-motion";
 import { useTTS } from "@/hooks/useTTS";
 import { registrarEEntrarNaFila } from "@/server/actions/atendimento";
-import { Loader2, ArrowLeft, HeartPulse, Play } from "lucide-react";
+import { Loader2, ArrowLeft, Play } from "lucide-react";
 import { TipoChamadaValue } from "@/types";
 import { toast } from "sonner";
 
@@ -100,7 +100,7 @@ export function KioskInteractionFlow({ handleToggleTalking }: KioskInteractionFl
       });
       toast.success("Entrada na fila registrada com sucesso.");
       setStep("SUCCESS");
-      setTimeout(() => resetFlow(), 5000);
+      setTimeout(() => resetFlow(), 10000);
     } catch {
       toast.error("Ocorreu um erro. Verifique os dados ou contate a recepção.");
     } finally {
@@ -124,7 +124,7 @@ export function KioskInteractionFlow({ handleToggleTalking }: KioskInteractionFl
             animate={{ opacity: 1, scale: 1 }}
             exit={{ opacity: 0, scale: 1.05 }}
             transition={{ duration: 0.4, ease: "easeOut" }}
-            className="pointer-events-auto mt-auto flex w-full justify-start px-6 pb-12"
+            className="pointer-events-auto mt-auto flex w-full justify-end px-8 pb-12"
           >
             <button
               type="button"
@@ -146,24 +146,24 @@ export function KioskInteractionFlow({ handleToggleTalking }: KioskInteractionFl
             transition={{ duration: 0.35, ease: "easeOut" }}
             className="pointer-events-auto mt-auto flex w-full justify-between gap-4 px-6 pb-10"
           >
-            <button
-              type="button"
-              onClick={() => handleChooseOption("normal")}
-              className={`${BTN_BASE} border border-violet-500/40 bg-violet-500/10 text-violet-200 hover:bg-violet-500/20`}
-            >
-              Entrar na fila
-              <span className="text-[16px] font-medium text-zinc-400">Aguardar atendimento</span>
-            </button>
-
+            {/* Botão URGENTE — Esquerdo */}
             <button
               type="button"
               onClick={() => handleChooseOption("urgente")}
               className={`${BTN_BASE} border border-red-500/40 bg-red-500/10 text-red-200 hover:bg-red-500/20`}
             >
-              <span className="flex items-center gap-1.5">
-                <HeartPulse className="h-4 w-4" /> Urgente
-              </span>
-              <span className="text-[16px] font-medium text-zinc-400">Falar com profissional</span>
+              Avisar Urgente.
+              <span className="text-[16px] font-medium text-zinc-400">Falar com alguém!</span>
+            </button>
+
+            {/* Botão NORMAL — Direito */}
+            <button
+              type="button"
+              onClick={() => handleChooseOption("normal")}
+              className={`${BTN_BASE} border border-violet-500/40 bg-violet-500/10 text-violet-200 hover:bg-violet-500/20`}
+            >
+              Avisar minha chegada!
+              <span className="text-[16px] font-medium text-zinc-400">Pacientes agendados.</span>
             </button>
           </motion.div>
         )}
@@ -216,7 +216,7 @@ export function KioskInteractionFlow({ handleToggleTalking }: KioskInteractionFl
                     <Loader2 className="h-5 w-5 animate-spin" /> Adicionando à fila...
                   </span>
                 ) : (
-                  "CONFIRMAR E ENTRAR NA FILA"
+                  "Avisar minha chegada!"
                 )}
               </button>
             </div>

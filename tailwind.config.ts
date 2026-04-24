@@ -5,6 +5,15 @@ const config = {
   content: ["./src/**/*.{ts,tsx}"],
   theme: {
     extend: {
+      keyframes: {
+        "progress-bar": {
+          "0%": { transform: "translateX(-100%)" },
+          "100%": { transform: "translateX(100%)" },
+        },
+      },
+      animation: {
+        "progress-bar": "progress-bar 1.4s ease-in-out infinite",
+      },
       colors: {
         primary: "var(--primary)",
         "primary-hover": "var(--primary-hover)",

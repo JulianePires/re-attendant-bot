@@ -39,7 +39,8 @@ const formSchema = z.object({
   email: z.string().email("E-mail corporativo inválido"),
   cpf: z.string().regex(/^\d{3}\.\d{3}\.\d{3}\-\d{2}$/, "CPF inválido"),
   password: z.string().min(6, "A senha precisa de pelo menos 6 caracteres"),
-  role: z.enum(["user", "admin"], { required_error: "Selecione o cargo" }),
+  // Roles válidas do sistema: 'profissional' (acesso ao painel) | 'admin' (super admin)
+  role: z.enum(["profissional", "admin"], { required_error: "Selecione o cargo" }),
 });
 
 export function ProfessionalRegistrationForm() {
@@ -60,7 +61,7 @@ export function ProfessionalRegistrationForm() {
       email: "",
       cpf: "",
       password: "",
-      role: "user",
+      role: "profissional",
     },
   });
 
@@ -74,7 +75,10 @@ export function ProfessionalRegistrationForm() {
         email: values.email,
         name: values.name,
         password: values.password,
-        role: values.role,
+        // Cast necessário: BetterAuth aceita roles customizadas em runtime;
+        // os tipos do SDK padrão limitam a "user" | "admin", mas o servidor
+        // respeita qualquer role configurada no arquivo auth.ts.
+        role: values.role as "admin",
         data: {
           cpf: values.cpf.replace(/\D/g, ""),
         },
@@ -189,7 +193,7 @@ export function ProfessionalRegistrationForm() {
                 <Briefcase className="pointer-events-none absolute top-1/2 left-3 z-10 h-4 w-4 -translate-y-1/2 text-zinc-500 dark:text-zinc-300" />
                 <Select
                   onValueChange={(value) =>
-                    setValue("role", value as "user" | "admin", { shouldValidate: true })
+                    setValue("role", value as "profissional" | "admin", { shouldValidate: true })
                   }
                   value={selectedRole}
                 >
@@ -197,8 +201,8 @@ export function ProfessionalRegistrationForm() {
                     <SelectValue placeholder="Selecione o cargo do colaborador" />
                   </SelectTrigger>
                   <SelectContent className="cursor-pointer border-zinc-800 bg-zinc-900 dark:text-zinc-300">
-                    <SelectItem value="user">
-                      Profissional de Saude (Recepcao/Atendimento)
+                    <SelectItem value="profissional">
+                      Profissional de Saúde (Recepção/Atendimento)
                     </SelectItem>
                     <SelectItem value="admin">Administrador (Acesso Total)</SelectItem>
                   </SelectContent>

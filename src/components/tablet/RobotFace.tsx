@@ -113,11 +113,14 @@ export function RobotEyebrow({ position, side }: RobotEyebrowProps) {
       }}
     >
       <div
-        className={`h-6 w-60 rounded-[50%] bg-slate-600 shadow-md ${
-          side === "left" ? "-rotate-12" : "rotate-12"
+        className={`h-5 w-56 bg-slate-600 shadow-md ${
+          side === "left" ? "-rotate-22" : "rotate-22"
         }`}
         style={{
-          borderRadius: side === "left" ? "40% 60% 50% 50%" : "60% 40% 50% 50%",
+          borderRadius:
+            side === "left"
+              ? "50% 50% 60% 40% / 80% 80% 20% 20%"
+              : "50% 50% 40% 60% / 80% 80% 20% 20%",
         }}
       />
     </motion.div>
@@ -144,7 +147,7 @@ export function RobotMouth({ isTalking = false }: RobotMouthProps) {
         <LottieHandler
           animationName="talking-mouth"
           loop
-          className="h-48 w-96"
+          className="h-64 w-300"
           style={{ filter: "drop-shadow(0 4px 8px rgba(0, 0, 0, 0.1))" }}
         />
       </motion.div>
@@ -167,7 +170,7 @@ export function RobotMouth({ isTalking = false }: RobotMouthProps) {
       <LottieHandler
         animationName="standy-mouth"
         loop
-        className="h-48 w-96"
+        className="h-64 w-lg"
         style={{ filter: "drop-shadow(0 4px 8px rgba(0, 0, 0, 0.1))" }}
       />
     </motion.div>

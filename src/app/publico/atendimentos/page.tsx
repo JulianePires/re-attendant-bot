@@ -1,90 +1,32 @@
 "use client";
 
-import { useOptimistic } from "react";
 import { motion, AnimatePresence } from "framer-motion";
 import { Users, AlertCircle, Inbox } from "lucide-react";
-import { useQuery, useMutation, useQueryClient } from "@tanstack/react-query";
-import { toast } from "sonner";
+import { useQuery } from "@tanstack/react-query";
 import { FILA_PUBLICA_QUERY_KEY, useRealtimeQueuePublic } from "@/hooks/useRealtimeQueuePublic";
-import { finalizarAtendimentoPublico, obterFilaPublica } from "@/server/actions/atendimento";
-import { AtendimentoCard } from "@/components/painel/AtendimentoCard";
-import { ConfirmarFinalizacaoDialog } from "@/components/painel/ConfirmarFinalizacaoDialog";
+import { obterFilaPublica } from "@/server/actions/atendimento";
 import type { AtendimentoNaFila } from "@/types";
-import { useState } from "react";
 import { cn } from "@/lib/utils";
 
 /**
- * Tela Pública de Atendimentos
- * Permite visualizar e concluir atendimentos sem necessidade de login
- * Utilizada por funcionários da recepção em dispositivos compartilhados
+ * Tela Pública de Atendimentos — READ-ONLY
+ * Exibe a fila em tempo real sem permitir ações de conclusão.
  */
 export default function PublicoAtendimentosPage() {
-  const queryClient = useQueryClient();
-  const [dialogAberto, setDialogAberto] = useState(false);
-  const [atendimentoSelecionado, setAtendimentoSelecionado] = useState<{
-    id: string;
-    nome: string;
-  } | null>(null);
-
   // Query da fila ativa
   const { data: filaAtiva = [], isError } = useQuery({
     queryKey: FILA_PUBLICA_QUERY_KEY,
     queryFn: obterFilaPublica,
     staleTime: 0,
-    refetchInterval: 5000, // Refetch a cada 5s como fallback
+    refetchInterval: 30000,
   });
 
   // Realtime updates
   useRealtimeQueuePublic();
 
-  // Optimistic updates
-  const [optimisticFila, setOptimisticFila] = useOptimistic<AtendimentoNaFila[], string>(
-    filaAtiva,
-    (state, atendimentoId) => state.filter((item) => item.id !== atendimentoId)
-  );
-
-  // Mutation para finalizar atendimento
-  const finalizarMutation = useMutation({
-    mutationFn: (atendimentoId: string) => finalizarAtendimentoPublico(atendimentoId),
-    onMutate: async (atendimentoId) => {
-      await queryClient.cancelQueries({ queryKey: FILA_PUBLICA_QUERY_KEY });
-      setOptimisticFila(atendimentoId);
-
-      const paciente = filaAtiva.find((a) => a.id === atendimentoId);
-      toast.success(`Atendimento concluído: ${paciente?.nomePaciente || "Paciente"}`, {
-        duration: 3000,
-        description: "O paciente foi removido da fila ativa",
-      });
-
-      // Fechar o diálogo
-      setDialogAberto(false);
-      setAtendimentoSelecionado(null);
-    },
-    onError: () => {
-      toast.error("Erro ao concluir atendimento", {
-        description: "Tente novamente ou contacte o suporte",
-      });
-      queryClient.invalidateQueries({ queryKey: FILA_PUBLICA_QUERY_KEY });
-    },
-    onSuccess: () => {
-      queryClient.invalidateQueries({ queryKey: FILA_PUBLICA_QUERY_KEY });
-    },
-  });
-
-  const handleAtender = (atendimentoId: string, nomePaciente: string) => {
-    setAtendimentoSelecionado({ id: atendimentoId, nome: nomePaciente });
-    setDialogAberto(true);
-  };
-
-  const handleConfirmarFinalizacao = () => {
-    if (atendimentoSelecionado) {
-      finalizarMutation.mutate(atendimentoSelecionado.id);
-    }
-  };
-
   // Separar por tipo
-  const pacientesNormais = optimisticFila.filter((a) => a.tipoChamada === "normal");
-  const pacientesUrgentes = optimisticFila.filter((a) => a.tipoChamada === "urgente");
+  const pacientesNormais = filaAtiva.filter((a) => a.tipoChamada === "normal");
+  const pacientesUrgentes = filaAtiva.filter((a) => a.tipoChamada === "urgente");
 
   // Estado de erro
   if (isError) {
@@ -106,7 +48,7 @@ export default function PublicoAtendimentosPage() {
           <div>
             <h1 className="text-3xl font-bold text-slate-100">Atendimentos</h1>
             <p className="mt-1 text-sm text-slate-400">
-              {optimisticFila.length} paciente{optimisticFila.length !== 1 ? "s" : ""} aguardando
+              {filaAtiva.length} paciente{filaAtiva.length !== 1 ? "s" : ""} aguardando
             </p>
           </div>
 
@@ -138,12 +80,10 @@ export default function PublicoAtendimentosPage() {
                 <EmptyState message="Nenhum paciente aguardando" />
               ) : (
                 pacientesNormais.map((atendimento, index) => (
-                  <AtendimentoCard
+                  <AtendimentoReadOnlyCard
                     key={atendimento.id}
                     atendimento={atendimento}
                     posicao={index + 1}
-                    onAtender={handleAtender}
-                    isLoading={finalizarMutation.isPending}
                     variant="normal"
                   />
                 ))
@@ -163,12 +103,10 @@ export default function PublicoAtendimentosPage() {
                 <EmptyState message="Nenhuma urgência no momento" variant="urgente" />
               ) : (
                 pacientesUrgentes.map((atendimento, index) => (
-                  <AtendimentoCard
+                  <AtendimentoReadOnlyCard
                     key={atendimento.id}
                     atendimento={atendimento}
                     posicao={index + 1}
-                    onAtender={handleAtender}
-                    isLoading={finalizarMutation.isPending}
                     variant="urgente"
                   />
                 ))
@@ -176,17 +114,48 @@ export default function PublicoAtendimentosPage() {
             </AnimatePresence>
           </ColumnSection>
         </div>
-
-        {/* Modal de Confirmação */}
-        <ConfirmarFinalizacaoDialog
-          open={dialogAberto}
-          onOpenChange={setDialogAberto}
-          nomePaciente={atendimentoSelecionado?.nome || ""}
-          onConfirm={handleConfirmarFinalizacao}
-          isLoading={finalizarMutation.isPending}
-        />
       </div>
     </div>
+  );
+}
+
+// ── Card read-only (sem botão de concluir) ──
+
+function AtendimentoReadOnlyCard({
+  atendimento,
+  posicao,
+  variant,
+}: {
+  atendimento: AtendimentoNaFila;
+  posicao: number;
+  variant: "normal" | "urgente";
+}) {
+  const isUrgente = variant === "urgente";
+
+  return (
+    <motion.div
+      layout
+      initial={{ opacity: 0, y: 8 }}
+      animate={{ opacity: 1, y: 0 }}
+      exit={{ opacity: 0, scale: 0.95 }}
+      transition={{ duration: 0.2 }}
+      className={cn(
+        "flex items-center gap-4 rounded-2xl border px-5 py-4",
+        isUrgente ? "border-red-500/20 bg-red-950/20" : "border-slate-700/50 bg-slate-900/60"
+      )}
+    >
+      <div
+        className={cn(
+          "flex h-9 w-9 shrink-0 items-center justify-center rounded-full text-sm font-bold",
+          isUrgente ? "bg-red-500/20 text-red-400" : "bg-violet-500/20 text-violet-400"
+        )}
+      >
+        {posicao}
+      </div>
+      <span className="flex-1 text-base font-semibold text-slate-100">
+        {atendimento.nomePaciente}
+      </span>
+    </motion.div>
   );
 }
 
