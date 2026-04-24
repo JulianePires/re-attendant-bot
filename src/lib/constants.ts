@@ -6,9 +6,9 @@ const APP_ROUTES: Record<string, string> = {
   HISTORICO: "/adm/historico",
   EQUIPE: "/adm/equipe",
   CONFIGURACOES: "/adm/configuracoes",
-  TOTEM: "/monitor",
+  TOTEM: "/recepcao",
   TV: "/tv",
-  PUBLICO_ATENDIMENTOS: "/recepcao",
+  PUBLICO_ATENDIMENTOS: "/monitor",
   ESQUECI_SENHA: "/esqueci-a-senha",
   REDEFINIR_SENHA: "/redefinir-senha",
 };
