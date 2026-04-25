@@ -1,8 +1,11 @@
 "use client";
 
-import { useState } from "react";
+import { Button } from "@/components/ui/button";
+import { Calendar } from "@/components/ui/calendar";
+import { Field, FieldLabel } from "@/components/ui/field";
+import { Popover, PopoverContent, PopoverTrigger } from "@/components/ui/popover";
 import { format } from "date-fns";
-import { CalendarIcon } from "lucide-react";
+import { ptBR } from "date-fns/locale";
 
 interface DatePickerProps {
   value: Date;
@@ -10,29 +13,32 @@ interface DatePickerProps {
 }
 
 const DatePicker: React.FC<DatePickerProps> = ({ value, onChange }) => {
-  const [isOpen, setIsOpen] = useState(false);
-
   return (
-    <div className="relative">
-      <button
-        onClick={() => setIsOpen(!isOpen)}
-        className="flex w-full items-center justify-between rounded-md border border-zinc-800 bg-zinc-900 px-3 py-2 text-white focus:border-purple-500 focus:ring-purple-500"
-      >
-        {format(value, "dd/MM/yyyy")}
-        <CalendarIcon className="ml-2 h-5 w-5 text-purple-500" />
-      </button>
-
-      {isOpen && (
-        <div className="absolute z-10 mt-2 w-full rounded-md bg-zinc-800 p-2 shadow-lg">
-          <input
-            type="date"
-            value={format(value, "yyyy-MM-dd")}
-            onChange={(e) => onChange(new Date(e.target.value))}
-            className="w-full rounded-md border border-zinc-700 bg-zinc-900 px-3 py-2 text-white focus:border-purple-500 focus:ring-purple-500"
+    <Field className="mx-auto w-full">
+      <FieldLabel htmlFor="date-picker-simple">Data</FieldLabel>
+      <Popover>
+        <PopoverTrigger asChild>
+          <Button variant="outline" id="date-picker-simple" className="justify-start font-normal cursor-pointer">
+            {value ? (
+              format(value, "PPP", {
+                locale: ptBR,
+              })
+            ) : (
+              <span>Selecione uma data</span>
+            )}
+          </Button>
+        </PopoverTrigger>
+        <PopoverContent className="w-auto p-0" align="start">
+          <Calendar
+            mode="single"
+            selected={value}
+            onSelect={(date) => date && onChange(date)}
+            defaultMonth={value}
+            required={false}
           />
-        </div>
-      )}
-    </div>
+        </PopoverContent>
+      </Popover>
+    </Field>
   );
 };
 

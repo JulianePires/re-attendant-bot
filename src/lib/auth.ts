@@ -23,8 +23,8 @@ export const auth = betterAuth({
     "http://localhost:3000",
     "https://re-attendant-bot.vercel.app",
     "re-attendant-bot.vercel.app",
-    "https://clinicareabi.com",
-    "clinicareabi.com",
+    "https://app.clinicareabi.com",
+    "app.clinicareabi.com",
   ],
 
   // Autenticação por e-mail e senha como método primário do sistema.
