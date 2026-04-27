@@ -13,12 +13,11 @@ import { APP_ROUTES } from "./lib/constants";
  */
 
 // Rotas protegidas por role RBAC
-const ADMIN_ONLY_ROUTES = [APP_ROUTES.EQUIPE];
+const ADMIN_ONLY_ROUTES = [APP_ROUTES.EQUIPE, APP_ROUTES.USUARIOS];
 
 // Rotas protegidas (requer autenticação)
 const PROTECTED_ROUTES = [
   APP_ROUTES.DASHBOARD,
-  APP_ROUTES.USUARIOS,
   APP_ROUTES.HISTORICO,
   APP_ROUTES.NOVO_USUARIO,
   APP_ROUTES.CONFIGURACOES,
@@ -29,11 +28,10 @@ const PUBLIC_ONLY_ROUTES = [
   APP_ROUTES.ESQUECI_SENHA,
   APP_ROUTES.REDEFINIR_SENHA,
   APP_ROUTES.LOGIN,
-  APP_ROUTES.TOTEM,
 ];
 
 // Rotas totalmente públicas (sem redirecionamento mesmo autenticado)
-const FULLY_PUBLIC_ROUTES = [APP_ROUTES.TV, APP_ROUTES.PUBLICO_ATENDIMENTOS];
+const FULLY_PUBLIC_ROUTES = [APP_ROUTES.TV, APP_ROUTES.PUBLICO_ATENDIMENTOS, APP_ROUTES.TOTEM];
 
 function matchRoute(pathname: string, route: string) {
   if (route === "/") {
