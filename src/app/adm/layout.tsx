@@ -24,9 +24,7 @@ export default function PainelLayout({ children }: { children: React.ReactNode }
       <PainelHeader onFullscreenToggle={setIsFullscreen} isFullscreen={isFullscreen} />
 
       {/* Main Content */}
-      <main
-        className={isFullscreen ? "h-full overflow-y-auto p-6" : "min-h-full px-6 pt-6 pb-24"}
-      >
+      <main className={isFullscreen ? "h-full overflow-y-auto p-6" : "min-h-full px-6 pt-6 pb-24"}>
         <div className="mx-auto max-w-screen-2xl">{children}</div>
       </main>
 

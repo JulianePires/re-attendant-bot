@@ -6,6 +6,9 @@ const nextConfig: NextConfig = {
   // Cria .next/standalone/ com apenas os arquivos necessários para rodar
   // a aplicação, sem precisar copiar node_modules completo.
   output: "standalone",
+  experimental: {
+    authInterrupts: true,
+  },
 };
 
 export default nextConfig;

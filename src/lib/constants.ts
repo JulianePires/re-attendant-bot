@@ -11,6 +11,7 @@ const APP_ROUTES: Record<string, string> = {
   PUBLICO_ATENDIMENTOS: "/monitor",
   ESQUECI_SENHA: "/esqueci-a-senha",
   REDEFINIR_SENHA: "/redefinir-senha",
+  FORBIDDEN: "/403",
 };
 
 export { APP_ROUTES };

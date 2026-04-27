@@ -40,7 +40,7 @@ export default function Forbidden() {
             className="flex items-center gap-2 rounded-lg bg-zinc-800 px-6 py-2 text-white transition-colors hover:bg-zinc-700"
           >
             <Home className="h-4 w-4" />
-            Voltar ao Admin
+            Voltar ao painel administrativo
           </Button>
 
           <Button

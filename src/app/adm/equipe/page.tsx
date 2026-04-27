@@ -1,9 +1,8 @@
-import { redirect } from "next/navigation";
-import { headers } from "next/headers";
 import { TeamList } from "@/components/dashboard/organisms/TeamList";
-import { RestrictedArea } from "@/components/painel/RestrictedArea";
-import { APP_ROUTES } from "@/lib/constants";
 import { auth } from "@/lib/auth";
+import { APP_ROUTES } from "@/lib/constants";
+import { headers } from "next/headers";
+import { forbidden, redirect } from "next/navigation";
 
 /**
  * Página de Gerenciamento de Equipe
@@ -27,7 +26,7 @@ export default async function EquipePage() {
 
   // Verifica se o usuário tem permissão de admin
   if (userRole !== "admin") {
-    return <RestrictedArea />;
+    forbidden();
   }
 
   return (

@@ -4,13 +4,29 @@ import { Maximize, Minimize } from "lucide-react";
 import { motion, AnimatePresence } from "framer-motion";
 import { NotificationBell } from "./NotificationBell";
 import { SignOutButton } from "./SignOutButton";
+import { useSession } from "@/lib/auth-client";
+import { Avatar, AvatarFallback, AvatarImage } from "@/components/ui/avatar";
 
 interface PainelHeaderProps {
   onFullscreenToggle?: (isFullscreen: boolean) => void;
   isFullscreen?: boolean;
 }
 
+function getInitials(name?: string | null): string {
+  if (!name) return "?";
+  return name
+    .trim()
+    .split(/\s+/)
+    .filter(Boolean)
+    .slice(0, 2)
+    .map((w) => w[0].toUpperCase())
+    .join("");
+}
+
 export function PainelHeader({ onFullscreenToggle, isFullscreen = false }: PainelHeaderProps) {
+  const { data: session } = useSession();
+  const initials = getInitials(session?.user?.name);
+
   const toggleFullscreen = () => {
     if (!document.fullscreenElement) {
       document.documentElement.requestFullscreen().then(() => {
@@ -37,11 +53,17 @@ export function PainelHeader({ onFullscreenToggle, isFullscreen = false }: Paine
             {/* Logo/Brand */}
             <div className="flex items-center gap-3">
               <div className="flex h-10 w-10 items-center justify-center rounded-lg bg-linear-to-br from-violet-600 to-violet-800 shadow-lg shadow-violet-500/20">
-                <span className="text-lg font-bold text-white">AC</span>
+                <Avatar className="h-8 w-8 rounded-full border-2 border-slate-800 bg-slate-700 text-sm font-medium text-slate-100">
+                  <AvatarImage
+                    src={session?.user ? "https://github.com/shadcn.png" : "/reabi.png"}
+                    alt="Avatar do usuário"
+                  />
+                  <AvatarFallback>{initials}</AvatarFallback>
+                </Avatar>
               </div>
               <div>
-                <h1 className="text-lg font-bold text-slate-100">Atendimentos</h1>
-                <p className="text-xs text-slate-400">Administração</p>
+                <h1 className="text-lg font-bold text-slate-100">Reabi - Painel Administrativo</h1>
+                <p className="text-xs text-slate-400">{session?.user?.name}</p>
               </div>
             </div>
 

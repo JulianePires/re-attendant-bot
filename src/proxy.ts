@@ -24,11 +24,7 @@ const PROTECTED_ROUTES = [
 ];
 
 // Rotas públicas para não autenticados (redireciona se já autenticado)
-const PUBLIC_ONLY_ROUTES = [
-  APP_ROUTES.ESQUECI_SENHA,
-  APP_ROUTES.REDEFINIR_SENHA,
-  APP_ROUTES.LOGIN,
-];
+const PUBLIC_ONLY_ROUTES = [APP_ROUTES.ESQUECI_SENHA, APP_ROUTES.REDEFINIR_SENHA, APP_ROUTES.LOGIN];
 
 // Rotas totalmente públicas (sem redirecionamento mesmo autenticado)
 const FULLY_PUBLIC_ROUTES = [APP_ROUTES.TV, APP_ROUTES.PUBLICO_ATENDIMENTOS, APP_ROUTES.TOTEM];
@@ -67,11 +63,6 @@ export async function proxy(request: NextRequest) {
     if (!isAuthenticated) {
       // Redireciona para login se não autenticado
       return NextResponse.redirect(new URL(APP_ROUTES.LOGIN, request.url));
-    }
-
-    if (userRole !== "admin") {
-      // Redireciona para dashboard se não for admin
-      return NextResponse.redirect(new URL(APP_ROUTES.DASHBOARD, request.url));
     }
   }
 

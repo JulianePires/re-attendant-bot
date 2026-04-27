@@ -17,10 +17,11 @@ const inter = Inter({
 
 export const metadata: Metadata = {
   title: {
-    default: "Clínica — Autoatendimento",
-    template: "%s | Clínica",
+    default: "Reabi — Autoatendimento",
+    template: "%s | Reabi",
   },
-  description: "Sistema de Autoatendimento e Gestão de Fila em Tempo Real",
+  description:
+    "Sistema de Autoatendimento e Gestão de Fila em Tempo Real da clínica de reabilitação Reabi.",
 };
 
 export default function RootLayout({ children }: Readonly<{ children: React.ReactNode }>) {
