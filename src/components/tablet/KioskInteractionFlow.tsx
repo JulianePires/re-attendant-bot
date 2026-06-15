@@ -22,6 +22,7 @@ export function KioskInteractionFlow({ handleToggleTalking }: KioskInteractionFl
 
   const { falar, parar } = useTTS();
   const timerRef = useRef<NodeJS.Timeout | null>(null);
+  const [viewportHeight, setViewportHeight] = useState<number | null>(null);
 
   // Zera todo o estado e volta pro inicio
   const resetFlow = () => {
@@ -59,6 +60,27 @@ export function KioskInteractionFlow({ handleToggleTalking }: KioskInteractionFl
     };
     // eslint-disable-next-line react-hooks/exhaustive-deps
   }, [step, nome]);
+
+  // Ajusta altura ao tamanho do viewport visual (teclado virtual no mobile/tablet)
+  useEffect(() => {
+    if (step !== "FORM") {
+      setViewportHeight(null);
+      return;
+    }
+
+    const vv = window.visualViewport;
+    if (!vv) return;
+
+    const update = () => setViewportHeight(vv.height);
+    update();
+    vv.addEventListener("resize", update);
+    vv.addEventListener("scroll", update);
+
+    return () => {
+      vv.removeEventListener("resize", update);
+      vv.removeEventListener("scroll", update);
+    };
+  }, [step]);
 
   // TTS Feedback — dispara ao entrar em HOME (após Iniciar) e demais telas
   useEffect(() => {
@@ -132,7 +154,7 @@ export function KioskInteractionFlow({ handleToggleTalking }: KioskInteractionFl
             <button
               type="button"
               onClick={handleStart}
-              className="flex items-center gap-3 rounded-full border border-emerald-800 bg-emerald-600 px-10 py-4 text-lg font-bold text-emerald-100 shadow-[0_0_30px_rgba(124,58,237,0.15)] backdrop-blur-sm transition-all hover:bg-emerald-600/50 hover:shadow-[0_0_40px_rgba(124,58,237,0.25)] active:scale-95 cursor-pointer"
+              className="flex cursor-pointer items-center gap-3 rounded-full border border-emerald-800 bg-emerald-600 px-10 py-4 text-lg font-bold text-emerald-100 shadow-[0_0_30px_rgba(124,58,237,0.15)] backdrop-blur-sm transition-all hover:bg-emerald-600/50 hover:shadow-[0_0_40px_rgba(124,58,237,0.25)] active:scale-95"
             >
               <Play className="h-5 w-5 fill-current" />
               Toque para iniciar
@@ -153,7 +175,7 @@ export function KioskInteractionFlow({ handleToggleTalking }: KioskInteractionFl
             <button
               type="button"
               onClick={() => handleChooseOption("urgente")}
-              className={`${BTN_BASE} border border-red-500 bg-red-500 text-red-200 hover:bg-red-500/50 cursor-pointer`}
+              className={`${BTN_BASE} cursor-pointer border border-red-500 bg-red-500 text-red-200 hover:bg-red-500/50`}
             >
               Avisar Urgente.
               <span className="text-[16px] font-medium text-zinc-100">Falar com alguém!</span>
@@ -163,7 +185,7 @@ export function KioskInteractionFlow({ handleToggleTalking }: KioskInteractionFl
             <button
               type="button"
               onClick={() => handleChooseOption("normal")}
-              className={`${BTN_BASE} border border-emerald-500 bg-emerald-500 text-emerald-200 hover:bg-emerald-500/50 cursor-pointer`}
+              className={`${BTN_BASE} cursor-pointer border border-emerald-500 bg-emerald-500 text-emerald-200 hover:bg-emerald-500/50`}
             >
               Avisar minha chegada!
               <span className="text-[16px] font-medium text-zinc-100">Pacientes agendados.</span>
@@ -178,7 +200,8 @@ export function KioskInteractionFlow({ handleToggleTalking }: KioskInteractionFl
             animate={{ opacity: 1 }}
             exit={{ opacity: 0 }}
             transition={{ duration: 0.35 }}
-            className="pointer-events-auto flex h-full w-full flex-col items-center justify-center"
+            className="pointer-events-auto flex w-full flex-col items-center justify-center overflow-y-auto"
+            style={viewportHeight ? { height: viewportHeight } : { height: "100%" }}
           >
             <motion.button
               initial={{ opacity: 0 }}
