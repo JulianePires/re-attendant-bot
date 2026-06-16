@@ -10,64 +10,45 @@ import type { AtendimentoNaFila } from "@/types";
 import { cn } from "@/lib/utils";
 import { calcularTempoEspera } from "@/lib/utils/funcoes";
 import { useState, useEffect, useRef } from "react";
+import { useWakeLock } from "react-screen-wake-lock";
 
 export default function RecepcaoPage() {
   const [isFullscreen, setIsFullscreen] = useState(false);
   const { tocarAlertaUrgente, tocarNotificacao } = useCampainha();
-  const wakeLockRef = useRef<WakeLockSentinel | null>(null);
+  const { isSupported, released, request, release } = useWakeLock({
+    onRequest: () => setIsFullscreen(true),
+    onError: () => {},
+    onRelease: () => setIsFullscreen(false),
+    reacquireOnPageVisible: true,
+  });
 
-  useEffect(() => {
-    let isMounted = true;
-
-    const releaseWakeLock = async () => {
-      if (!wakeLockRef.current) return;
-      try {
-        await wakeLockRef.current.release();
-      } catch {
-        // Ignora falhas na liberação; o navegador pode já ter liberado o lock.
-      } finally {
-        wakeLockRef.current = null;
+  function handleActivateFullscreen() {
+    if (isSupported) {
+      if (released) {
+        request();
       }
-    };
+    } else {
+      setIsFullscreen(true);
+    }
+  }
 
-    const requestWakeLock = async () => {
-      if (!isMounted || typeof window === "undefined") return;
-      if (!("wakeLock" in navigator) || document.visibilityState !== "visible") return;
-
-      try {
-        const sentinel = await navigator.wakeLock.request("screen");
-        wakeLockRef.current = sentinel;
-
-        sentinel.addEventListener("release", () => {
-          wakeLockRef.current = null;
-        });
-      } catch (error) {
-        console.warn("[monitor] Não foi possível ativar Wake Lock.", error);
+  function handleDeactivateFullscreen() {
+    if (isSupported) {
+      if (!released) {
+        release();
       }
-    };
-
-    const handleVisibilityChange = async () => {
-      if (document.visibilityState === "visible") {
-        await requestWakeLock();
-        return;
-      }
-
-      await releaseWakeLock();
-    };
-
-    void requestWakeLock();
-    document.addEventListener("visibilitychange", handleVisibilityChange);
-
-    return () => {
-      isMounted = false;
-      document.removeEventListener("visibilitychange", handleVisibilityChange);
-      void releaseWakeLock();
-    };
-  }, []);
+    } else {
+      setIsFullscreen(false);
+    }
+  }
 
   useEffect(() => {
     const handleFullscreenChange = () => {
-      setIsFullscreen(!!document.fullscreenElement);
+      if (!document.fullscreenElement) {
+        handleDeactivateFullscreen();
+      } else {
+        handleActivateFullscreen();
+      }
     };
 
     document.addEventListener("fullscreenchange", handleFullscreenChange);
@@ -77,11 +58,11 @@ export default function RecepcaoPage() {
   const toggleFullscreen = () => {
     if (!document.fullscreenElement) {
       document.documentElement.requestFullscreen().then(() => {
-        setIsFullscreen(true);
+        handleActivateFullscreen();
       });
     } else {
       document.exitFullscreen().then(() => {
-        setIsFullscreen(false);
+        handleDeactivateFullscreen();
       });
     }
   };

@@ -4,7 +4,8 @@ import { useEffect, useState } from "react";
 import { motion } from "framer-motion";
 import { RobotFaceContainer } from "@/components/tablet/RobotFaceContainer";
 import { KioskInteractionFlow } from "@/components/tablet/KioskInteractionFlow";
-import { Maximize, Minimize } from "lucide-react";
+import { Maximize } from "lucide-react";
+import { useWakeLock } from "react-screen-wake-lock";
 
 /**
  * Tela principal do Totem de Autoatendimento
@@ -15,10 +16,38 @@ import { Maximize, Minimize } from "lucide-react";
 export default function TabletPage() {
   const [isTalking, setIsTalking] = useState(false);
   const [isFullscreen, setIsFullscreen] = useState(false);
+  const { isSupported, released, request, release } = useWakeLock({
+    onRequest: () => setIsFullscreen(true),
+    onError: () => {},
+    onRelease: () => setIsFullscreen(false),
+    reacquireOnPageVisible: false,
+  });
+
+  function handleActivateFullscreen() {
+    if (isSupported) {
+      if (released) {
+        request();
+      }
+    } else {
+      setIsFullscreen(true);
+    }
+  }
+
+  function handleDeactivateFullscreen() {
+    if (isSupported) {
+      if (!released) {
+        release();
+      }
+    } else {
+      setIsFullscreen(false);
+    }
+  }
 
   useEffect(() => {
     const handleFullscreenChange = () => {
-      setIsFullscreen(!!document.fullscreenElement);
+      if (!document.fullscreenElement) {
+        handleDeactivateFullscreen();
+      }
     };
 
     document.addEventListener("fullscreenchange", handleFullscreenChange);
@@ -28,7 +57,7 @@ export default function TabletPage() {
   const enableFullscreen = () => {
     if (!document.fullscreenElement) {
       document.documentElement.requestFullscreen().then(() => {
-        setIsFullscreen(true);
+        handleActivateFullscreen();
       });
     }
   };
