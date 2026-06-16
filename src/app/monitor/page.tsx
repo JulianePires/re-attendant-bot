@@ -14,6 +14,56 @@ import { useState, useEffect, useRef } from "react";
 export default function RecepcaoPage() {
   const [isFullscreen, setIsFullscreen] = useState(false);
   const { tocarAlertaUrgente, tocarNotificacao } = useCampainha();
+  const wakeLockRef = useRef<WakeLockSentinel | null>(null);
+
+  useEffect(() => {
+    let isMounted = true;
+
+    const releaseWakeLock = async () => {
+      if (!wakeLockRef.current) return;
+      try {
+        await wakeLockRef.current.release();
+      } catch {
+        // Ignora falhas na liberação; o navegador pode já ter liberado o lock.
+      } finally {
+        wakeLockRef.current = null;
+      }
+    };
+
+    const requestWakeLock = async () => {
+      if (!isMounted || typeof window === "undefined") return;
+      if (!("wakeLock" in navigator) || document.visibilityState !== "visible") return;
+
+      try {
+        const sentinel = await navigator.wakeLock.request("screen");
+        wakeLockRef.current = sentinel;
+
+        sentinel.addEventListener("release", () => {
+          wakeLockRef.current = null;
+        });
+      } catch (error) {
+        console.warn("[monitor] Não foi possível ativar Wake Lock.", error);
+      }
+    };
+
+    const handleVisibilityChange = async () => {
+      if (document.visibilityState === "visible") {
+        await requestWakeLock();
+        return;
+      }
+
+      await releaseWakeLock();
+    };
+
+    void requestWakeLock();
+    document.addEventListener("visibilitychange", handleVisibilityChange);
+
+    return () => {
+      isMounted = false;
+      document.removeEventListener("visibilitychange", handleVisibilityChange);
+      void releaseWakeLock();
+    };
+  }, []);
 
   useEffect(() => {
     const handleFullscreenChange = () => {
