@@ -65,8 +65,8 @@ export default function ForgetPasswordPage() {
   }
 
   return (
-    <div className="relative flex min-h-screen w-full items-center justify-center overflow-hidden bg-zinc-950 p-4 text-zinc-100">
-      <Card className="relative z-10 w-full max-w-7xl animate-in rounded-3xl border-zinc-800/60 bg-zinc-900/60 shadow-2xl backdrop-blur-xl duration-500 zoom-in-95 fade-in">
+    <div className="relative flex min-h-screen w-full items-center justify-center overflow-hidden bg-linear-to-br from-slate-950 via-slate-900 to-slate-950 p-4 text-zinc-100">
+      <Card className="relative z-10 w-full max-w-lg animate-in rounded-3xl border-zinc-800/60 bg-zinc-900/60 shadow-2xl backdrop-blur-xl duration-500 zoom-in-95 fade-in">
         <CardHeader className="pt-8 pb-8 text-center">
           <div className="mx-auto mb-4 flex h-16 w-16 items-center justify-center rounded-2xl border border-violet-500/20 bg-violet-500/10 shadow-[0_0_20px_rgba(124,58,237,0.1)]">
             <Mail className="h-8 w-8 text-violet-400" />

@@ -1,5 +1,4 @@
 import { ProfessionalRegistrationForm } from "@/components/dashboard/organisms/ProfessionalRegistrationForm";
-import { RestrictedArea } from "@/components/painel/RestrictedArea";
 import { auth } from "@/lib/auth";
 import { APP_ROUTES } from "@/lib/constants";
 import { ArrowLeft } from "lucide-react";

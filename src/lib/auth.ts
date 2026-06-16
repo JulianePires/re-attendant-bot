@@ -3,6 +3,13 @@ import { prismaAdapter } from "better-auth/adapters/prisma";
 import { admin } from "better-auth/plugins";
 import { prisma } from "@/lib/prisma";
 import { nextCookies } from "better-auth/next-js";
+import { sendEmail, sendPasswordResetEmail } from "@/lib/email/service";
+import { emailConfig } from "@/lib/email/config";
+import {
+  betterAuthEmailAdapter,
+  PasswordChangedEmailTemplate,
+  PasswordResetEmailTemplate,
+} from "./email";
 
 // ================================================================
 // INICIALIZAÇÃO DO BETTERAUTH
@@ -33,8 +40,24 @@ export const auth = betterAuth({
     enabled: true,
     // Ativar verificação em produção após configurar o provider de e-mail
     requireEmailVerification: false,
+    sendResetPassword: async ({ user, url, token }, request) => {
+      await betterAuthEmailAdapter.sendPasswordResetEmail(user.email, {
+        url,
+        token,
+      });
+    },
+    onPasswordReset: async ({ user }, request) => {
+      try {
+        await betterAuthEmailAdapter.sendCustomEmail(
+          user.email,
+          "Senha Alterada com Sucesso",
+          PasswordChangedEmailTemplate(user.name || "Usuário")
+        );
+      } catch (error) {
+        console.error("[Auth] Erro ao enviar email de confirmação de senha alterada:", error);
+      }
+    },
   },
-
   plugins: [
     // ----------------------------------------------------------------
     // PLUGIN DE ADMIN — Gerenciamento de RBAC
