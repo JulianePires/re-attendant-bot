@@ -7,6 +7,7 @@ const APP_ROUTES: Record<string, string> = {
   EQUIPE: "/adm/equipe",
   CONFIGURACOES: "/adm/configuracoes",
   TOTEM: "/recepcao",
+  TOTEM_CRM: "/recepcao-crm",
   TV: "/tv",
   PUBLICO_ATENDIMENTOS: "/monitor",
   ESQUECI_SENHA: "/esqueci-a-senha",
