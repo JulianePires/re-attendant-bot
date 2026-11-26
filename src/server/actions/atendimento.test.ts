@@ -1,5 +1,7 @@
 import { afterEach, beforeEach, describe, expect, it, vi } from "vitest";
 
+vi.mock("server-only", () => ({}));
+
 const { atendimentoCreate, userFindMany, notificacaoCreateMany } = vi.hoisted(() => ({
   atendimentoCreate: vi.fn(),
   userFindMany: vi.fn(),
@@ -55,6 +57,23 @@ describe("registrarEEntrarNaFila", () => {
 
       expect(notificacaoCreateMany).toHaveBeenCalledWith(
         notificacoes("Novo paciente na fila", "Novo Paciente: Ana", "NORMAL")
+      );
+    });
+  });
+
+  describe("Totem atual continua igual", () => {
+    it("cria o atendimento sem consultaHash e com a notificação de hoje", async () => {
+      await registrarEEntrarNaFila({ nome: "Carlos Lima", tipoChamada: "normal" });
+
+      const { data } = atendimentoCreate.mock.calls[0][0];
+      expect(data).toEqual({
+        nomePaciente: "Carlos Lima",
+        tipoChamada: "normal",
+        status: "aguardando",
+      });
+      expect("consultaHash" in data).toBe(false);
+      expect(notificacaoCreateMany).toHaveBeenCalledWith(
+        notificacoes("Novo paciente na fila", "Novo Paciente: Carlos Lima", "NORMAL")
       );
     });
   });

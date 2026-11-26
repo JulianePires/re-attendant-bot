@@ -20,7 +20,7 @@ import {
   type CategoriaMotivoConfirmacao,
 } from "@/lib/crm/contrato";
 import { limitadorBuscas } from "@/lib/crm/limitador";
-import { registrarChamadaCrm } from "@/lib/crm/log";
+import { registrarChamadaCrm, registrarFalhaFila } from "@/lib/crm/log";
 import {
   MENSAGEM_CHAVE_INVALIDA,
   MENSAGEM_CHEGADA_CONFIRMADA,
@@ -30,6 +30,8 @@ import {
   TEXTO_PADRAO_POR_CATEGORIA,
 } from "@/lib/crm/mensagens";
 import { validarTelefone } from "@/lib/crm/telefone";
+import { codigoDoErro } from "@/lib/utils/erros";
+import { entrarNaFilaPorConsulta } from "@/server/fila";
 
 // Borda da action: o cliente pode mandar qualquer coisa. 20 caracteres cobrem
 // o maior formato aceito com máscara: "+55 (11) 98765-4321".
@@ -154,6 +156,24 @@ const CONFIRMACAO_INDISPONIVEL: RespostaConfirmarChegada = {
 const schemaEntradaComprovante = z.string().min(1).max(2048);
 
 /**
+ * Chegada confirmada (ou já registrada) no CRM: o paciente entra na fila normal, uma vez
+ * por consulta (RF-001.17). Se a fila falhar, ele é mandado à recepção (UC-002 E8).
+ */
+async function entrarNaFilaDepoisDaConfirmacao(
+  agendamento: { nome: string; consultaId: string },
+  mensagem: string,
+  correlacao: string
+): Promise<RespostaConfirmarChegada> {
+  try {
+    await entrarNaFilaPorConsulta({ nome: agendamento.nome, consultaId: agendamento.consultaId });
+    return { tipo: "chegada_registrada", mensagem };
+  } catch (erro) {
+    registrarFalhaFila({ correlacao, codigo: codigoDoErro(erro) });
+    return CONFIRMACAO_INDISPONIVEL;
+  }
+}
+
+/**
  * Confirma a chegada no CRM para o agendamento localizado nesta interação (UC-002).
  * Sem comprovante autêntico, válido e deste tablet, o CRM não é chamado (RNF-001.2).
  */
@@ -176,6 +196,7 @@ export async function confirmarChegadaCheckin(
   if (!config) return CONFIRMACAO_INDISPONIVEL;
 
   const inicio = Date.now();
+  const correlacao = randomUUID();
   const { resultado, statusHttp, ok } = await confirmarNoCrm(config, agendamento.consultaId);
   const categoria =
     resultado.tipo === "negocio" ? classificarMotivoConfirmacao(resultado.motivo) : resultado.tipo;
@@ -189,14 +210,15 @@ export async function confirmarChegadaCheckin(
     statusHttp,
     ok,
     duracaoMs: Date.now() - inicio,
-    correlacao: randomUUID(),
+    correlacao,
   });
 
   if (resultado.tipo === "confirmado") {
-    return {
-      tipo: "chegada_registrada",
-      mensagem: resultado.mensagem?.trim() || MENSAGEM_CHEGADA_CONFIRMADA,
-    };
+    return entrarNaFilaDepoisDaConfirmacao(
+      agendamento,
+      resultado.mensagem?.trim() || MENSAGEM_CHEGADA_CONFIRMADA,
+      correlacao
+    );
   }
   // Erro técnico: mensagem padrão do totem, nunca a `mensagem` do corpo (RF-001.11).
   if (resultado.tipo !== "negocio") return CONFIRMACAO_INDISPONIVEL;
@@ -204,7 +226,9 @@ export async function confirmarChegadaCheckin(
   const categoriaNegocio = categoria as CategoriaMotivoConfirmacao;
   const texto = resultado.mensagem?.trim() || TEXTO_PADRAO_CONFIRMACAO[categoriaNegocio];
   // ja_registrado é sucesso (RF-001.9).
-  if (categoriaNegocio === "ja_registrado") return { tipo: "chegada_registrada", mensagem: texto };
+  if (categoriaNegocio === "ja_registrado") {
+    return entrarNaFilaDepoisDaConfirmacao(agendamento, texto, correlacao);
+  }
   if (categoriaNegocio === "nao_encontrada") return { tipo: "nao_encontrada", mensagem: texto };
   return { tipo: "impedimento", mensagem: texto };
 }

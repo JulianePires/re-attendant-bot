@@ -130,6 +130,10 @@ model Atendimento {
   finalizadoEm DateTime?
   arquivadoTurno Boolean @default(false)
 
+  // Hash SHA-256 do consulta_id do CRM (totem de teste, ADR 0004). Só o hash: a TV
+  // lê esta tabela com a chave pública. Único: um atendimento por consulta.
+  consultaHash String? @unique
+
   // Índice composto para queries de fila (status + criadoEm é o padrão de ordenação)
   @@index([status, criadoEm])
   @@map("atendimento")

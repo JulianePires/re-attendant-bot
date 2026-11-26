@@ -24,9 +24,9 @@ Depois que o CRM confirma a chegada (ou responde `ja_registrado`), o paciente en
 
 ## Requisitos
 
-- O `Atendimento` ganha uma coluna opcional `consultaId`, única quando preenchida. Os atendimentos do `/recepcao` continuam sem ela (RF-001.7, RF-001.20).
+- O `Atendimento` ganha uma coluna opcional `consultaHash`, única quando preenchida, com o hash SHA-256 do `consulta_id` e nunca o id puro, porque a TV lê a tabela com a chave pública (ADR 0004). Os atendimentos do `/recepcao` continuam sem ela (RF-001.7, RF-001.20).
 - A migration só adiciona a coluna: nenhum dado existente muda, e o `/recepcao`, a TV, o monitor e o painel funcionam como antes (RNF-001.12).
-- Depois de uma confirmação com sucesso ou `ja_registrado`, o sistema coloca o paciente na fila como chamada **normal** com o **nome completo** (`nome`) do CRM e o `consultaId` da consulta. A equipe recebe a notificação de hoje, "Novo paciente na fila" (RF-001.17).
+- Depois de uma confirmação com sucesso ou `ja_registrado`, o sistema coloca o paciente na fila como chamada **normal** com o **nome completo** (`nome`) do CRM, vinculado à consulta pelo hash. A equipe recebe a notificação de hoje, "Novo paciente na fila" (RF-001.17).
 - Se já existe atendimento para essa consulta (duplo toque, nova confirmação, dois totens), nenhum atendimento nem notificação a mais é criado, e o paciente vê a tela de sucesso normalmente (RF-001.7, E1, E9).
 - Se a criação na fila falhar depois do CRM confirmar, o paciente vê "Não foi possível concluir seu check-in agora. Por favor, procure a recepção." em vez da tela de sucesso, e o log registra a falha com destaque, sem dados pessoais (E8).
 - O nome completo entra no banco só pelo atendimento da fila. Telefone, procedimento e `consulta_id` não vão para log (RNF-001.5, RNF-001.6).
@@ -87,7 +87,7 @@ Funcionalidade: Paciente com chegada confirmada entra na fila
 ## Critérios de aceite
 
 - [ ] Os 6 cenários acima passam como testes automatizados.
-- [ ] A migration adiciona só a coluna `consultaId` (opcional, única) e não altera dados existentes; o Prisma Client é regenerado.
+- [ ] A migration adiciona só a coluna `consultaHash` (opcional, única) e não altera dados existentes; o Prisma Client é regenerado.
 - [ ] A unicidade vem do banco (índice único); a corrida de duas confirmações é tratada pelo erro de unicidade, sem duplicar.
 - [ ] `/recepcao`, TV, monitor e painel continuam iguais, e os testes existentes passam.
 - [ ] O passo manual de deploy (`prisma migrate deploy`) está descrito na PR.
@@ -106,4 +106,4 @@ Funcionalidade: Paciente com chegada confirmada entra na fila
 
 ## Limites
 
-- Até 20 arquivos. Sem dependência nova. A mudança no schema vai para ADR.
+- Até 20 arquivos. Sem dependência nova. A mudança no schema está na ADR 0004.
