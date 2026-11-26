@@ -62,12 +62,14 @@ export const auth = betterAuth({
     // ----------------------------------------------------------------
     // PLUGIN DE ADMIN — Gerenciamento de RBAC
     // O plugin adiciona e gerencia o campo `role` no model User.
-    // - adminRole: usuários com este role têm acesso a rotas protegidas
-    //              e às funções de gestão da fila (painel do profissional).
+    // - adminRoles: roles com acesso aos endpoints do plugin
+    //               (/api/auth/admin/*: alterar role, banir, listar usuários).
+    //               Apenas "admin" — profissionais NÃO podem alterar roles.
+    //               O acesso ao painel /adm é controlado em src/proxy.ts.
     // - defaultRole: atribuído automaticamente a todo novo cadastro.
     // ----------------------------------------------------------------
     admin({
-      adminRole: "profissional",
+      adminRoles: ["admin"],
       defaultRole: "paciente",
     }),
     nextCookies(),

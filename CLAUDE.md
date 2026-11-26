@@ -6,8 +6,6 @@ This file provides guidance to Claude Code (claude.ai/code) when working with co
 
 Clinic self-service kiosk + real-time queue management (Next.js 16 App Router, React 19, TypeScript strict). Code, comments, identifiers and UI text are in **Portuguese (pt-BR)** — keep new code consistent (e.g. `nomePaciente`, `tipoChamada`, `criadoEm`).
 
-Note: `README.md` is partly outdated (it describes `/painel` routes and an `Atendimento → User` FK that no longer exist). Trust the code over the README.
-
 ## Commands
 
 Package manager is **pnpm** (pinned via `packageManager` in `package.json`; `pnpm-lock.yaml`). Packages allowed to run install scripts are listed in `pnpm.onlyBuiltDependencies`. If you add a dependency that needs a postinstall step, add it there.
