@@ -25,16 +25,18 @@ export const betterAuthEmailAdapter = {
    * @param data - Dados da solicitação
    * @param data.url - URL completa para redefinição (incluindo token)
    * @param data.token - Token de redefinição
+   * @param data.name - Nome do destinatário, usado na saudação (opcional)
    */
   sendPasswordResetEmail: async (
     email: string,
     data: {
       url: string;
       token: string;
+      name?: string | null;
     }
   ) => {
     try {
-      await sendPasswordResetEmail(email, data.url);
+      await sendPasswordResetEmail(email, data.url, data.name ?? undefined);
     } catch (error) {
       const errorMessage = error instanceof Error ? error.message : "Erro desconhecido";
       console.error("[BetterAuth] Erro ao enviar email de redefinição:", errorMessage);

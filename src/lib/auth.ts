@@ -44,6 +44,7 @@ export const auth = betterAuth({
       await betterAuthEmailAdapter.sendPasswordResetEmail(user.email, {
         url,
         token,
+        name: user.name,
       });
     },
     onPasswordReset: async ({ user }, request) => {
