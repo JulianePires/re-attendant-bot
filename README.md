@@ -19,7 +19,7 @@ Sistema clínico fullstack que combina um **totem de autoatendimento** (tablet p
 - [Autenticação e RBAC](#autenticação-e-rbac)
 - [Testes](#testes)
 - [Scripts Disponíveis](#scripts-disponíveis)
-- [Deploy (Coolify)](#deploy-coolify)
+- [Deploy (Vercel)](#deploy-vercel)
 
 ---
 
@@ -67,8 +67,8 @@ Paciente toca no totem
 | Testes          | Vitest + React Testing Library + jsdom                  |
 | Linting         | ESLint 9 + Prettier + eslint-config-prettier            |
 | Commits         | Husky + lint-staged + commitlint (Conventional Commits) |
-| Package manager | Bun                                                     |
-| Deploy          | Coolify (Nixpacks)                                      |
+| Package manager | pnpm                                                    |
+| Deploy          | Vercel                                                  |
 
 ---
 
@@ -129,8 +129,7 @@ Paciente toca no totem
 ├── commitlint.config.mjs
 ├── docker-compose.yml           # PostgreSQL local via Podman/Docker
 ├── eslint.config.mjs
-├── next.config.ts               # output: standalone, React Compiler
-├── nixpacks.toml                # Config de build para Coolify
+├── next.config.ts               # React Compiler
 ├── postcss.config.mjs
 ├── tsconfig.json
 └── vitest.config.ts
@@ -140,10 +139,10 @@ Paciente toca no totem
 
 ## Pré-requisitos
 
-- [Bun](https://bun.sh) >= 1.1
+- [Node.js](https://nodejs.org) >= 20 e [pnpm](https://pnpm.io) >= 10
 - [Podman](https://podman.io) ou Docker (banco local)
 - Conta no [Supabase](https://supabase.com) (banco de produção + Realtime)
-- Instância do [Coolify](https://coolify.io) (deploy)
+- Projeto na [Vercel](https://vercel.com) (deploy)
 
 ---
 
@@ -155,24 +154,24 @@ git clone <url-do-repositorio>
 cd re-attendant-bot
 
 # 2. Instalar dependências
-bun install
+pnpm install
 
 # 3. Copiar e preencher as variáveis de ambiente
 cp .env.example .env.local
 
 # 4. Inicializar o Husky (git hooks)
-bun prepare
+pnpm prepare
 
 # 5. Subir o banco de dados local
-bun podman:up        # ou: podman compose up -d
+pnpm podman:up            # ou: podman compose up -d
 
 # 6. Aplicar o schema ao banco
-bun db:push          # rápido para dev (sem migration versionada)
+pnpm db:push              # rápido para dev (sem migration versionada)
 # OU
-bun db:migrate       # cria arquivo em prisma/migrations/ (recomendado para produção)
+pnpm db:migrate           # cria arquivo em prisma/migrations/ (recomendado para produção)
 
 # 7. Iniciar o servidor de desenvolvimento
-bun dev
+pnpm dev
 ```
 
 ---
@@ -265,11 +264,11 @@ NEXT_PUBLIC_APP_URL="http://localhost:3000"   # URL pública (browser)
 ### Comandos do banco
 
 ```bash
-bun db:generate   # Regenera o Prisma Client após mudanças no schema
-bun db:push       # Aplica schema sem criar migration (desenvolvimento)
-bun db:migrate    # Cria e aplica migration versionada
-bun db:studio     # Abre o Prisma Studio no browser
-bun db:reset      # Descarta todas as migrations e recria o banco
+pnpm db:generate          # Regenera o Prisma Client após mudanças no schema
+pnpm db:push              # Aplica schema sem criar migration (desenvolvimento)
+pnpm db:migrate           # Cria e aplica migration versionada
+pnpm db:studio            # Abre o Prisma Studio no browser
+pnpm db:reset             # Descarta todas as migrations e recria o banco
 ```
 
 ---
@@ -479,9 +478,9 @@ src/test/setup.ts       → import "@testing-library/jest-dom/vitest"
 ### Executar testes
 
 ```bash
-bun run test              # modo watch
-bun run test --run        # execução única (CI)
-bun run test:coverage     # relatório de cobertura em /coverage
+pnpm test                 # modo watch
+pnpm test run             # execução única (CI)
+pnpm test:coverage        # relatório de cobertura em /coverage
 ```
 
 ### Cobertura atual
@@ -502,38 +501,38 @@ bun run test:coverage     # relatório de cobertura em /coverage
 
 ```bash
 # Desenvolvimento
-bun dev                   # Next.js com Turbopack
-bun build                 # Build de produção
-bun start                 # Servidor de produção
+pnpm dev                  # Next.js com Turbopack
+pnpm build                # Build de produção
+pnpm start                # Servidor de produção
 
 # Qualidade de código
-bun lint                  # ESLint
-bun lint:fix              # ESLint com auto-fix
-bun format                # Prettier (escreve)
-bun format:check          # Prettier (verifica, usado em CI)
-bun type-check            # tsc --noEmit
+pnpm lint                 # ESLint
+pnpm lint:fix             # ESLint com auto-fix
+pnpm format               # Prettier (escreve)
+pnpm format:check         # Prettier (verifica, usado em CI)
+pnpm type-check           # tsc --noEmit
 
 # Testes
-bun run test              # Vitest (watch)
-bun run test:ui           # Vitest UI no browser
-bun run test:coverage     # Cobertura de código
+pnpm test                 # Vitest (watch)
+pnpm test:ui              # Vitest UI no browser
+pnpm test:coverage        # Cobertura de código
 
 # Banco de dados
-bun db:generate           # Gera Prisma Client
-bun db:push               # Aplica schema sem migration
-bun db:migrate            # Cria + aplica migration versionada
-bun db:seed               # Cria usuário admin padrão (se banco vazio)
-bun db:studio             # Prisma Studio no browser
-bun db:reset              # Reseta o banco completamente
+pnpm db:generate          # Gera Prisma Client
+pnpm db:push              # Aplica schema sem migration
+pnpm db:migrate           # Cria + aplica migration versionada
+pnpm db:seed              # Cria usuário admin padrão (se banco vazio)
+pnpm db:studio            # Prisma Studio no browser
+pnpm db:reset             # Reseta o banco completamente
 
 # Banco local (Podman)
-bun podman:up             # Sobe PostgreSQL em background
-bun podman:down           # Para o container (dados preservados)
-bun podman:reset          # Para + apaga volume (dados perdidos)
-bun podman:logs           # Tail dos logs do container
+pnpm podman:up            # Sobe PostgreSQL em background
+pnpm podman:down          # Para o container (dados preservados)
+pnpm podman:reset         # Para + apaga volume (dados perdidos)
+pnpm podman:logs          # Tail dos logs do container
 
 # Git hooks
-bun prepare               # Instala Husky
+pnpm prepare              # Instala Husky
 ```
 
 ### Rotas de autenticação
@@ -544,46 +543,38 @@ bun prepare               # Instala Husky
 
 ### Credenciais iniciais (seed)
 
-Após rodar `bun db:seed` com banco vazio:
+Após rodar `pnpm db:seed` com banco vazio:
 
 - Email: `admin@clinica.com`
 - Senha: use o fluxo "Esqueci a Senha" para definir a primeira senha
 
 ---
 
-## Deploy (Coolify)
+## Deploy (Vercel)
 
-O deploy usa **Nixpacks** com `output: standalone` do Next.js.
+O deploy é feito na **Vercel**, que detecta Next.js e pnpm (via `pnpm-lock.yaml` / campo `packageManager`) automaticamente — não há `vercel.json`.
 
 ### Fluxo de CI/CD
 
 ```
 git push
     │
-    ▼ Coolify detecta evento
-    ├─ bun install --frozen-lockfile
-    ├─ bunx prisma generate
-    ├─ bun run build               (output: standalone)
-    └─ cp assets → .next/standalone/
-    │
-    ▼ Pre-deploy Command
-    bunx prisma migrate deploy     (aplica migrações pendentes)
-    │
-    ▼
-    node .next/standalone/server.js  (porta 3000)
+    ▼ Vercel detecta o push (preview em branches, produção na main)
+    ├─ pnpm install
+    └─ pnpm build                  (prisma generate && next build)
 ```
 
-### Variáveis obrigatórias no Coolify
+### Migrações
 
-Todas as variáveis do `.env.example` devem ser configuradas em **Environment Variables** antes do primeiro deploy. As variáveis `NEXT_PUBLIC_*` são embutidas no bundle durante o build.
+As migrações **não** rodam no build. Ao publicar uma mudança de schema, aplique-as manualmente usando a `DIRECT_URL` (conexão direta, porta 5432):
 
-### Configuração no Coolify
+```bash
+pnpm exec prisma migrate deploy
+```
 
-| Campo              | Valor                        |
-| ------------------ | ---------------------------- |
-| Build Pack         | Nixpacks                     |
-| Port               | `3000`                       |
-| Pre-deploy Command | `bunx prisma migrate deploy` |
+### Variáveis de ambiente
+
+Todas as variáveis do `.env.example` (e as de SMTP) devem ser configuradas em **Project Settings → Environment Variables** na Vercel antes do primeiro deploy. As variáveis `NEXT_PUBLIC_*` são embutidas no bundle durante o build, então alterá-las exige um novo deploy. Novos domínios devem ser adicionados também em `trustedOrigins` em `src/lib/auth.ts`.
 
 ---
 
