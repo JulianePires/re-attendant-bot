@@ -45,6 +45,23 @@ export const betterAuthEmailAdapter = {
   },
 
   /**
+   * Envia email de confirmação de senha alterada
+   * Chamado após uma redefinição de senha bem-sucedida
+   *
+   * @param email - Email do destinatário
+   * @param name - Nome do destinatário, usado na saudação (opcional)
+   */
+  sendPasswordChangedEmail: async (email: string, name?: string | null) => {
+    try {
+      await sendPasswordChangedEmail(email, name ?? undefined);
+    } catch (error) {
+      const errorMessage = error instanceof Error ? error.message : "Erro desconhecido";
+      console.error("[BetterAuth] Erro ao enviar email de senha alterada:", errorMessage);
+      throw error;
+    }
+  },
+
+  /**
    * Envia email de confirmação de email (se habilitado na configuração)
    * Chamado quando o usuário registra uma conta e precisa confirmar o email
    */

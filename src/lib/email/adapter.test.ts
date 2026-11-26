@@ -54,3 +54,26 @@ describe("betterAuthEmailAdapter.sendPasswordResetEmail", () => {
     ).rejects.toThrow("SMTP indisponível");
   });
 });
+
+describe("betterAuthEmailAdapter.sendPasswordChangedEmail", () => {
+  it("envia o e-mail de senha alterada com o nome do usuário", async () => {
+    await betterAuthEmailAdapter.sendPasswordChangedEmail("ana@clinica.com", "Ana Souza");
+
+    expect(mocks.sendPasswordChangedEmail).toHaveBeenCalledWith("ana@clinica.com", "Ana Souza");
+  });
+
+  it("envia sem nome quando o usuário não tem nome", async () => {
+    await betterAuthEmailAdapter.sendPasswordChangedEmail("sem-nome@clinica.com", null);
+
+    expect(mocks.sendPasswordChangedEmail).toHaveBeenCalledWith("sem-nome@clinica.com", undefined);
+  });
+
+  it("propaga erros do serviço de e-mail", async () => {
+    mocks.sendPasswordChangedEmail.mockRejectedValueOnce(new Error("SMTP indisponível"));
+    vi.spyOn(console, "error").mockImplementation(() => {});
+
+    await expect(
+      betterAuthEmailAdapter.sendPasswordChangedEmail("ana@clinica.com", "Ana")
+    ).rejects.toThrow("SMTP indisponível");
+  });
+});
