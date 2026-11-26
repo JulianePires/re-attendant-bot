@@ -6,6 +6,7 @@ import { z } from "zod";
  */
 
 const CAMINHO_LOCALIZAR = "/agenda/localizar";
+const CAMINHO_CONFIRMAR = "/agenda/confirmar";
 
 export type ConfigRequisicaoCrm = {
   baseUrl: string;
@@ -14,6 +15,8 @@ export type ConfigRequisicaoCrm = {
 
 export type AgendamentoLocalizado = {
   consultaId: string;
+  /** Nome completo: só no servidor e no comprovante cifrado, para a fila (RF-001.17). */
+  nome: string;
   primeiroNome: string;
   hora: string;
   profissional: string;
@@ -29,11 +32,13 @@ export type ResultadoLocalizacao =
 
 const textoObrigatorio = z.string().min(1);
 
-// Procedimento, nome completo e `mensagem` ficam de fora: o totem não os exibe
-// (RNF-001.5, Q-08) e a confirmação usa mensagem própria (RF-001.3).
+// Procedimento e `mensagem` ficam de fora: o totem não os exibe (RNF-001.5, Q-08) e a
+// confirmação usa mensagem própria (RF-001.3). O nome completo é guardado para a fila
+// (RF-001.17); sem ele, usa-se o primeiro nome.
 const schemaSucessoLocalizar = z.object({
   ok: z.literal(true),
   consulta_id: textoObrigatorio,
+  nome: z.string().optional(),
   primeiro_nome: textoObrigatorio,
   hora: textoObrigatorio,
   profissional: textoObrigatorio,
@@ -69,21 +74,36 @@ export function classificarMotivo(motivo: string): CategoriaMotivo {
     : "desconhecido";
 }
 
-export function montarRequisicaoLocalizar(
+function montarRequisicao(
   config: ConfigRequisicaoCrm,
-  telefone: string
+  caminho: string,
+  corpo: Record<string, string>
 ): { url: string; init: RequestInit } {
   return {
-    url: `${config.baseUrl.replace(/\/+$/, "")}${CAMINHO_LOCALIZAR}`,
+    url: `${config.baseUrl.replace(/\/+$/, "")}${caminho}`,
     init: {
       method: "POST",
       headers: {
         "x-api-key": config.apiKey,
         "Content-Type": "application/json",
       },
-      body: JSON.stringify({ telefone }),
+      body: JSON.stringify(corpo),
     },
   };
+}
+
+export function montarRequisicaoLocalizar(
+  config: ConfigRequisicaoCrm,
+  telefone: string
+): { url: string; init: RequestInit } {
+  return montarRequisicao(config, CAMINHO_LOCALIZAR, { telefone });
+}
+
+export function montarRequisicaoConfirmar(
+  config: ConfigRequisicaoCrm,
+  consultaId: string
+): { url: string; init: RequestInit } {
+  return montarRequisicao(config, CAMINHO_CONFIRMAR, { consulta_id: consultaId });
 }
 
 /**
@@ -97,11 +117,66 @@ export function interpretarRespostaLocalizar(status: number, corpo: unknown): Re
 
   const sucesso = schemaSucessoLocalizar.safeParse(corpo);
   if (sucesso.success) {
-    const { consulta_id, primeiro_nome, hora, profissional } = sucesso.data;
+    const { consulta_id, nome, primeiro_nome, hora, profissional } = sucesso.data;
     return {
       tipo: "encontrado",
-      agendamento: { consultaId: consulta_id, primeiroNome: primeiro_nome, hora, profissional },
+      agendamento: {
+        consultaId: consulta_id,
+        nome: nome?.trim() || primeiro_nome,
+        primeiroNome: primeiro_nome,
+        hora,
+        profissional,
+      },
     };
+  }
+
+  const negocio = schemaErroNegocio.safeParse(corpo);
+  if (negocio.success) {
+    return { tipo: "negocio", motivo: negocio.data.motivo, mensagem: negocio.data.mensagem };
+  }
+
+  return { tipo: "tecnico", causa: "resposta_invalida" };
+}
+
+// ---- Confirmação de chegada (UC-002) ----
+
+export type ResultadoConfirmacao =
+  | { tipo: "confirmado"; status: string; mensagem?: string }
+  | { tipo: "negocio"; motivo: string; mensagem?: string }
+  | {
+      tipo: "tecnico";
+      causa: "status_http" | "resposta_invalida" | "sem_resposta" | "tempo_esgotado";
+    };
+
+export type CategoriaMotivoConfirmacao = "ja_registrado" | "nao_encontrada" | "desconhecido";
+
+const schemaSucessoConfirmar = z.object({
+  ok: z.literal(true),
+  status: textoObrigatorio,
+  mensagem: z.string().optional(),
+});
+
+// `ja_registrado` é sucesso (RF-001.9); `nao_encontrada` só existe na confirmação.
+const CATEGORIA_POR_MOTIVO_CONFIRMACAO: Record<string, CategoriaMotivoConfirmacao> = {
+  ja_registrado: "ja_registrado",
+  nao_encontrada: "nao_encontrada",
+};
+
+export function classificarMotivoConfirmacao(motivo: string): CategoriaMotivoConfirmacao {
+  return Object.hasOwn(CATEGORIA_POR_MOTIVO_CONFIRMACAO, motivo)
+    ? CATEGORIA_POR_MOTIVO_CONFIRMACAO[motivo]
+    : "desconhecido";
+}
+
+/** Mesma regra da localização: o status HTTP decide antes do corpo (RNF-001.9). */
+export function interpretarRespostaConfirmar(status: number, corpo: unknown): ResultadoConfirmacao {
+  if (status < 200 || status > 299) {
+    return { tipo: "tecnico", causa: "status_http" };
+  }
+
+  const sucesso = schemaSucessoConfirmar.safeParse(corpo);
+  if (sucesso.success) {
+    return { tipo: "confirmado", status: sucesso.data.status, mensagem: sucesso.data.mensagem };
   }
 
   const negocio = schemaErroNegocio.safeParse(corpo);

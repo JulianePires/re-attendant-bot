@@ -7,6 +7,7 @@ import { useTTS } from "@/hooks/useTTS";
 import {
   FALA_BOAS_VINDAS,
   FALA_PEDIR_TELEFONE,
+  FALA_REGISTRANDO,
   MENSAGEM_ERRO_TECNICO,
   MENSAGEM_PROFISSIONAL_CHAMADO,
   falaConfirmacao,
@@ -14,6 +15,7 @@ import {
 } from "@/lib/crm/mensagens";
 import { formatarTelefone, validarTelefone } from "@/lib/crm/telefone";
 import {
+  confirmarChegadaCheckin,
   localizarAgendamentoCheckin,
   type RespostaLocalizarAgendamento,
 } from "@/server/actions/checkin-crm";
@@ -26,6 +28,7 @@ type Etapa =
   | "TELEFONE"
   | "BUSCANDO"
   | "CONFIRMAR"
+  | "REGISTRANDO"
   | "NEGOCIO"
   | "CHEGADA_REGISTRADA"
   | "FALAR_PROFISSIONAL"
@@ -35,11 +38,14 @@ type Etapa =
 type Agendamento = Extract<RespostaLocalizarAgendamento, { tipo: "encontrado" }>["agendamento"];
 
 // Respostas que mostram a tela de resultado: as demais têm tela própria.
+// `nao_encontrada` vem da confirmação (UC-002 E2) e, como o impedimento, só oferece voltar.
 type ResultadoNegocio = {
-  tipo: Exclude<
-    RespostaLocalizarAgendamento["tipo"],
-    "encontrado" | "telefone_invalido" | "chegada_ja_registrada" | "indisponivel"
-  >;
+  tipo:
+    | Exclude<
+        RespostaLocalizarAgendamento["tipo"],
+        "encontrado" | "telefone_invalido" | "chegada_ja_registrada" | "indisponivel"
+      >
+    | "nao_encontrada";
   mensagem: string;
 };
 
@@ -95,10 +101,13 @@ export function KioskCheckinFlow({ handleToggleTalking }: KioskCheckinFlowProps)
   const [mensagemIndisponivel, setMensagemIndisponivel] = useState("");
   const [resultadoNegocio, setResultadoNegocio] = useState<ResultadoNegocio | null>(null);
   const [mensagemChegada, setMensagemChegada] = useState("");
+  // Comprovante opaco do agendamento localizado (ADR 0003); o tablet só o devolve.
+  const [comprovante, setComprovante] = useState<string | null>(null);
   // Cada toque reinicia a contagem de inatividade.
   const [toques, setToques] = useState(0);
   // O estado só muda na próxima renderização; o ref bloqueia o segundo toque já no mesmo ciclo (E11).
   const buscandoRef = useRef(false);
+  const confirmandoRef = useRef(false);
 
   const { falar, parar } = useTTS();
 
@@ -117,6 +126,7 @@ export function KioskCheckinFlow({ handleToggleTalking }: KioskCheckinFlowProps)
     setMensagemIndisponivel("");
     setResultadoNegocio(null);
     setMensagemChegada("");
+    setComprovante(null);
   }
 
   function voltarAoInicio() {
@@ -152,11 +162,13 @@ export function KioskCheckinFlow({ handleToggleTalking }: KioskCheckinFlowProps)
     }
 
     buscandoRef.current = true;
+    setComprovante(null);
     setEtapa("BUSCANDO");
     try {
       const resposta = await localizarAgendamentoCheckin(validacao.digitos);
       if (resposta.tipo === "encontrado") {
         setAgendamento(resposta.agendamento);
+        setComprovante(resposta.comprovante);
         setEtapa("CONFIRMAR");
       } else if (resposta.tipo === "telefone_invalido") {
         setErroTelefone(resposta.mensagem);
@@ -182,6 +194,31 @@ export function KioskCheckinFlow({ handleToggleTalking }: KioskCheckinFlowProps)
     }
   }
 
+  async function confirmarChegada() {
+    if (confirmandoRef.current || !comprovante) return;
+
+    confirmandoRef.current = true;
+    setEtapa("REGISTRANDO");
+    try {
+      const resposta = await confirmarChegadaCheckin(comprovante);
+      if (resposta.tipo === "chegada_registrada") {
+        setMensagemChegada(resposta.mensagem);
+        setEtapa("CHEGADA_REGISTRADA");
+      } else if (resposta.tipo === "nao_encontrada" || resposta.tipo === "impedimento") {
+        setResultadoNegocio({ tipo: resposta.tipo, mensagem: resposta.mensagem });
+        setEtapa("NEGOCIO");
+      } else {
+        setMensagemIndisponivel(resposta.mensagem);
+        setEtapa("INDISPONIVEL");
+      }
+    } catch {
+      setMensagemIndisponivel(MENSAGEM_ERRO_TECNICO);
+      setEtapa("INDISPONIVEL");
+    } finally {
+      confirmandoRef.current = false;
+    }
+  }
+
   useEffect(() => {
     switch (etapa) {
       case "HOME":
@@ -192,6 +229,9 @@ export function KioskCheckinFlow({ handleToggleTalking }: KioskCheckinFlowProps)
         break;
       case "CONFIRMAR":
         if (agendamento) falarComRosto(falaConfirmacao(agendamento.primeiroNome));
+        break;
+      case "REGISTRANDO":
+        falarComRosto(FALA_REGISTRANDO);
         break;
       case "INDISPONIVEL":
         falarComRosto(mensagemIndisponivel);
@@ -362,8 +402,7 @@ export function KioskCheckinFlow({ handleToggleTalking }: KioskCheckinFlowProps)
               >
                 {montarMensagemConfirmacao(agendamento)}
               </p>
-              {/* A confirmação de chegada é do UC-002 (outra spec). */}
-              <button type="button" className={BOTAO_PRIMARIO}>
+              <button type="button" onClick={confirmarChegada} className={BOTAO_PRIMARIO}>
                 Confirmar chegada
               </button>
               <button type="button" onClick={irParaTelefone} className={BOTAO_SECUNDARIO}>
@@ -373,13 +412,35 @@ export function KioskCheckinFlow({ handleToggleTalking }: KioskCheckinFlowProps)
           </motion.div>
         )}
 
+        {etapa === "REGISTRANDO" && (
+          <motion.div
+            key="registrando"
+            {...transicao}
+            className="pointer-events-auto flex h-full w-full flex-col items-center justify-center px-4"
+          >
+            <div className={CARTAO} aria-live="polite" aria-busy="true">
+              <p className="flex items-center justify-center gap-3 text-2xl font-semibold text-white">
+                <Loader2 className="h-7 w-7 animate-spin" aria-hidden="true" />
+                Registrando sua chegada...
+              </p>
+            </div>
+          </motion.div>
+        )}
+
         {etapa === "NEGOCIO" && resultadoNegocio && (
           <motion.div
             key="negocio"
             {...transicao}
             className="pointer-events-auto flex h-full w-full flex-col items-center justify-center px-4"
           >
-            <section className={CARTAO} aria-label="Resultado da busca">
+            <section
+              className={CARTAO}
+              aria-label={
+                resultadoNegocio.tipo === "nao_encontrada" || comprovante
+                  ? "Resultado da confirmação"
+                  : "Resultado da busca"
+              }
+            >
               {/* O texto vem do CRM sem alteração; o motivo bruto não chega aqui (RF-001.8). */}
               <p
                 role="alert"

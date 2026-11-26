@@ -10,15 +10,23 @@ import {
   gerarAutorizacao,
   obterDispositivoAutorizado,
 } from "@/lib/crm/acesso";
-import { localizarNoCrm } from "@/lib/crm/client";
+import { confirmarNoCrm, localizarNoCrm } from "@/lib/crm/client";
+import { abrirComprovante, emitirComprovante } from "@/lib/crm/comprovante";
 import { checkinCrmHabilitado, obterChaveAcesso, obterConfigCrm } from "@/lib/crm/config";
-import { classificarMotivo, type CategoriaMotivo } from "@/lib/crm/contrato";
+import {
+  classificarMotivo,
+  classificarMotivoConfirmacao,
+  type CategoriaMotivo,
+  type CategoriaMotivoConfirmacao,
+} from "@/lib/crm/contrato";
 import { limitadorBuscas } from "@/lib/crm/limitador";
-import { registrarLocalizacao } from "@/lib/crm/log";
+import { registrarChamadaCrm } from "@/lib/crm/log";
 import {
   MENSAGEM_CHAVE_INVALIDA,
+  MENSAGEM_CHEGADA_CONFIRMADA,
   MENSAGEM_ERRO_TECNICO,
   MENSAGEM_TELEFONE_INVALIDO,
+  TEXTO_PADRAO_CONFIRMACAO,
   TEXTO_PADRAO_POR_CATEGORIA,
 } from "@/lib/crm/mensagens";
 import { validarTelefone } from "@/lib/crm/telefone";
@@ -39,6 +47,8 @@ export type RespostaLocalizarAgendamento =
   | {
       tipo: "encontrado";
       agendamento: { primeiroNome: string; hora: string; profissional: string };
+      /** Opaco e cifrado (ADR 0003): o tablet só o devolve na confirmação. */
+      comprovante: string;
     }
   | { tipo: TipoRespostaNegocio; mensagem: string }
   | { tipo: "indisponivel"; mensagem: string };
@@ -102,7 +112,8 @@ export async function localizarAgendamentoCheckin(
   const categoria =
     resultado.tipo === "negocio" ? classificarMotivo(resultado.motivo) : resultado.tipo;
 
-  registrarLocalizacao({
+  registrarChamadaCrm({
+    operacao: "localizar",
     categoria,
     causa: resultado.tipo === "tecnico" ? resultado.causa : undefined,
     motivo: resultado.tipo === "negocio" ? resultado.motivo : undefined,
@@ -117,8 +128,85 @@ export async function localizarAgendamentoCheckin(
   // Erro técnico: mensagem padrão do totem, nunca a `mensagem` do corpo (RF-001.11).
   if (resultado.tipo !== "encontrado") return INDISPONIVEL;
 
-  const { primeiroNome, hora, profissional } = resultado.agendamento;
-  return { tipo: "encontrado", agendamento: { primeiroNome, hora, profissional } };
+  const chave = obterChaveAcesso();
+  if (!chave) return INDISPONIVEL;
+
+  const { consultaId, nome, primeiroNome, hora, profissional } = resultado.agendamento;
+  return {
+    tipo: "encontrado",
+    agendamento: { primeiroNome, hora, profissional },
+    comprovante: emitirComprovante({ consultaId, nome, primeiroNome, idDispositivo }, chave),
+  };
+}
+
+export type RespostaConfirmarChegada =
+  | { tipo: "chegada_registrada"; mensagem: string }
+  | { tipo: "nao_encontrada"; mensagem: string }
+  | { tipo: "impedimento"; mensagem: string }
+  | { tipo: "indisponivel"; mensagem: string };
+
+const CONFIRMACAO_INDISPONIVEL: RespostaConfirmarChegada = {
+  tipo: "indisponivel",
+  mensagem: MENSAGEM_ERRO_TECNICO,
+};
+
+// O comprovante cifrado tem algumas centenas de caracteres.
+const schemaEntradaComprovante = z.string().min(1).max(2048);
+
+/**
+ * Confirma a chegada no CRM para o agendamento localizado nesta interação (UC-002).
+ * Sem comprovante autêntico, válido e deste tablet, o CRM não é chamado (RNF-001.2).
+ */
+export async function confirmarChegadaCheckin(
+  comprovante: string
+): Promise<RespostaConfirmarChegada> {
+  if (!checkinCrmHabilitado()) return CONFIRMACAO_INDISPONIVEL;
+
+  const idDispositivo = await obterDispositivoAutorizado();
+  const chave = obterChaveAcesso();
+  if (!idDispositivo || !chave) return CONFIRMACAO_INDISPONIVEL;
+
+  const entrada = schemaEntradaComprovante.safeParse(comprovante);
+  if (!entrada.success) return CONFIRMACAO_INDISPONIVEL;
+
+  const agendamento = abrirComprovante(entrada.data, chave, idDispositivo);
+  if (!agendamento) return CONFIRMACAO_INDISPONIVEL;
+
+  const config = obterConfigCrm();
+  if (!config) return CONFIRMACAO_INDISPONIVEL;
+
+  const inicio = Date.now();
+  const { resultado, statusHttp, ok } = await confirmarNoCrm(config, agendamento.consultaId);
+  const categoria =
+    resultado.tipo === "negocio" ? classificarMotivoConfirmacao(resultado.motivo) : resultado.tipo;
+
+  registrarChamadaCrm({
+    operacao: "confirmar",
+    categoria,
+    causa: resultado.tipo === "tecnico" ? resultado.causa : undefined,
+    motivo: resultado.tipo === "negocio" ? resultado.motivo : undefined,
+    desconhecido: categoria === "desconhecido",
+    statusHttp,
+    ok,
+    duracaoMs: Date.now() - inicio,
+    correlacao: randomUUID(),
+  });
+
+  if (resultado.tipo === "confirmado") {
+    return {
+      tipo: "chegada_registrada",
+      mensagem: resultado.mensagem?.trim() || MENSAGEM_CHEGADA_CONFIRMADA,
+    };
+  }
+  // Erro técnico: mensagem padrão do totem, nunca a `mensagem` do corpo (RF-001.11).
+  if (resultado.tipo !== "negocio") return CONFIRMACAO_INDISPONIVEL;
+
+  const categoriaNegocio = categoria as CategoriaMotivoConfirmacao;
+  const texto = resultado.mensagem?.trim() || TEXTO_PADRAO_CONFIRMACAO[categoriaNegocio];
+  // ja_registrado é sucesso (RF-001.9).
+  if (categoriaNegocio === "ja_registrado") return { tipo: "chegada_registrada", mensagem: texto };
+  if (categoriaNegocio === "nao_encontrada") return { tipo: "nao_encontrada", mensagem: texto };
+  return { tipo: "impedimento", mensagem: texto };
 }
 
 export type RespostaAtivarTotem = { ok: true } | { ok: false; mensagem: string };

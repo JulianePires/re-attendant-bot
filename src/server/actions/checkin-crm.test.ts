@@ -14,7 +14,19 @@ import {
 } from "@/lib/crm/acesso";
 import { limitadorBuscas } from "@/lib/crm/limitador";
 import { MENSAGEM_CHAVE_INVALIDA } from "@/lib/crm/mensagens";
-import { ativarTotemCheckin, localizarAgendamentoCheckin } from "./checkin-crm";
+import {
+  consultaIdLocalizada,
+  respostaConfirmacaoDadosInvalidos,
+  respostaConfirmacaoJaRegistrado,
+  respostaConfirmacaoNaoEncontrada,
+  respostaConfirmacaoSucesso,
+  respostaConfirmacaoTokenInvalido,
+} from "@/lib/crm/__fixtures__/confirmar";
+import {
+  ativarTotemCheckin,
+  confirmarChegadaCheckin,
+  localizarAgendamentoCheckin,
+} from "./checkin-crm";
 
 const URL_BASE = "https://crm.exemplo.test/functions/v1";
 const CHAVE = "chave-de-teste";
@@ -79,6 +91,7 @@ describe("localizarAgendamentoCheckin", () => {
           hora: "14:00",
           profissional: "Ana Lima",
         },
+        comprovante: expect.any(String),
       });
     });
 
@@ -818,5 +831,360 @@ describe("localizarAgendamentoCheckin - erros técnicos na localização", () =>
         statusHttp: null,
       });
     });
+  });
+});
+
+const MSG_SUCESSO_PADRAO = "Sua chegada foi registrada. Aguarde, você será chamado(a) em breve.";
+const MSG_JA_REGISTRADO_PADRAO =
+  "Sua chegada já estava registrada. Aguarde, você será chamado(a) em breve.";
+const MSG_IMPEDIMENTO_PADRAO =
+  "Não foi possível continuar seu check-in. Por favor, procure a recepção.";
+
+async function obterComprovante(): Promise<string> {
+  fetchMock.mockResolvedValueOnce(respostaHttp(respostaSucesso));
+  const r = await localizarAgendamentoCheckin("11987654321");
+  if (r.tipo !== "encontrado") throw new Error("localização de apoio falhou");
+  fetchMock.mockReset();
+  return r.comprovante;
+}
+
+function linhasLogConfirmar(espioes: { mock: { calls: unknown[][] } }[]) {
+  return espioes
+    .flatMap((e) => e.mock.calls)
+    .map((args) => String(args[0]))
+    .flatMap((linha) => {
+      try {
+        const json = JSON.parse(linha);
+        return json && json.evento === "crm.confirmar" ? [json] : [];
+      } catch {
+        return [];
+      }
+    });
+}
+
+describe("confirmarChegadaCheckin", () => {
+  describe("Cenário: Chegada confirmada", () => {
+    it("returns chegada_registrada with the CRM message and sends consulta_id to the CRM once", async () => {
+      const comprovante = await obterComprovante();
+      fetchMock.mockResolvedValue(respostaHttp(respostaConfirmacaoSucesso));
+
+      const resultado = await confirmarChegadaCheckin(comprovante);
+
+      expect(resultado).toEqual({
+        tipo: "chegada_registrada",
+        mensagem: respostaConfirmacaoSucesso.corpo.mensagem,
+      });
+      expect(fetchMock).toHaveBeenCalledTimes(1);
+      const [url, init] = fetchMock.mock.calls[0];
+      expect(String(url)).toBe(`${URL_BASE}/agenda/confirmar`);
+      expect(init.method).toBe("POST");
+      expect(new Headers(init.headers).get("x-api-key")).toBe(CHAVE);
+      expect(JSON.parse(init.body)).toEqual({ consulta_id: consultaIdLocalizada });
+    });
+
+    it("uses the default success text when the CRM sends no message", async () => {
+      const comprovante = await obterComprovante();
+      fetchMock.mockResolvedValue(
+        respostaHttp({ status: 200, corpo: { ok: true, status: "realizada" } })
+      );
+
+      const resultado = await confirmarChegadaCheckin(comprovante);
+
+      expect(resultado).toEqual({ tipo: "chegada_registrada", mensagem: MSG_SUCESSO_PADRAO });
+    });
+  });
+
+  describe("Cenário: Chegada já registrada na confirmação", () => {
+    it("returns chegada_registrada with the CRM message for ja_registrado", async () => {
+      const comprovante = await obterComprovante();
+      fetchMock.mockResolvedValue(respostaHttp(respostaConfirmacaoJaRegistrado));
+
+      const resultado = await confirmarChegadaCheckin(comprovante);
+
+      expect(resultado).toEqual({
+        tipo: "chegada_registrada",
+        mensagem: "Sua chegada já foi registrada.",
+      });
+    });
+
+    it("uses the default already-registered text when the CRM sends no message", async () => {
+      const comprovante = await obterComprovante();
+      fetchMock.mockResolvedValue(corpoNegocio("ja_registrado"));
+
+      const resultado = await confirmarChegadaCheckin(comprovante);
+
+      expect(resultado).toEqual({ tipo: "chegada_registrada", mensagem: MSG_JA_REGISTRADO_PADRAO });
+    });
+  });
+
+  describe("Cenário: Consulta não encontrada na confirmação", () => {
+    it("returns nao_encontrada with the CRM message", async () => {
+      const comprovante = await obterComprovante();
+      fetchMock.mockResolvedValue(respostaHttp(respostaConfirmacaoNaoEncontrada));
+
+      const resultado = await confirmarChegadaCheckin(comprovante);
+
+      expect(resultado).toEqual({
+        tipo: "nao_encontrada",
+        mensagem: "Não encontrei essa consulta.",
+      });
+    });
+  });
+
+  describe("Esquema do Cenário: Motivo fora da tabela ou sem mensagem na confirmação", () => {
+    it.each([
+      [
+        "dados_invalidos com mensagem",
+        respostaConfirmacaoDadosInvalidos.corpo,
+        { tipo: "impedimento", mensagem: "Faltou alguma informação para eu concluir." },
+      ],
+      [
+        "dados_invalidos sem mensagem",
+        { ok: false, motivo: "dados_invalidos" },
+        { tipo: "impedimento", mensagem: MSG_IMPEDIMENTO_PADRAO },
+      ],
+      [
+        "dados_invalidos com mensagem em branco",
+        { ok: false, motivo: "dados_invalidos", mensagem: "  " },
+        { tipo: "impedimento", mensagem: MSG_IMPEDIMENTO_PADRAO },
+      ],
+      [
+        "nao_encontrada sem mensagem",
+        { ok: false, motivo: "nao_encontrada" },
+        { tipo: "nao_encontrada", mensagem: "Não encontrei essa consulta." },
+      ],
+    ])("returns the expected result for %s", async (_rotulo, corpo, esperado) => {
+      const comprovante = await obterComprovante();
+      fetchMock.mockResolvedValue(respostaHttp({ status: 200, corpo }));
+
+      const resultado = await confirmarChegadaCheckin(comprovante);
+
+      expect(resultado).toEqual(esperado);
+      expect(JSON.stringify(resultado)).not.toContain("dados_invalidos");
+    });
+
+    it("logs the unknown motivo with console.warn and desconhecido true", async () => {
+      const comprovante = await obterComprovante();
+      const warn = vi.spyOn(console, "warn").mockImplementation(() => {});
+      vi.spyOn(console, "info").mockImplementation(() => {});
+      fetchMock.mockResolvedValue(respostaHttp(respostaConfirmacaoDadosInvalidos));
+
+      await confirmarChegadaCheckin(comprovante);
+
+      const linhas = linhasLogConfirmar([warn]);
+      expect(linhas).toHaveLength(1);
+      expect(linhas[0]).toMatchObject({
+        operacao: "confirmar",
+        motivo: "dados_invalidos",
+        desconhecido: true,
+      });
+    });
+  });
+
+  describe("Esquema do Cenário: Comprovante do agendamento recusado", () => {
+    const recusa = { tipo: "indisponivel", mensagem: MENSAGEM_ERRO_TECNICO };
+    const T0 = new Date("2026-11-26T10:00:00Z");
+
+    afterEach(() => {
+      vi.useRealTimers();
+    });
+
+    it("refuses a comprovante issued more than 5 minutes ago without calling the CRM", async () => {
+      vi.useFakeTimers({ toFake: ["Date"] });
+      vi.setSystemTime(T0);
+      const comprovante = await obterComprovante();
+      vi.setSystemTime(new Date(T0.getTime() + 5 * 60_000 + 1000));
+
+      const resultado = await confirmarChegadaCheckin(comprovante);
+
+      expect(resultado).toEqual(recusa);
+      expect(fetchMock).not.toHaveBeenCalled();
+    });
+
+    it("accepts a comprovante still inside the 5 minute window", async () => {
+      vi.useFakeTimers({ toFake: ["Date"] });
+      vi.setSystemTime(T0);
+      const comprovante = await obterComprovante();
+      vi.setSystemTime(new Date(T0.getTime() + 4 * 60_000));
+      fetchMock.mockResolvedValue(respostaHttp(respostaConfirmacaoSucesso));
+
+      const resultado = await confirmarChegadaCheckin(comprovante);
+
+      expect(resultado.tipo).toBe("chegada_registrada");
+    });
+
+    it("refuses a tampered comprovante without calling the CRM", async () => {
+      const comprovante = await obterComprovante();
+      const meio = Math.floor(comprovante.length / 2);
+      const troca = comprovante[meio] === "A" ? "B" : "A";
+      const adulterado = comprovante.slice(0, meio) + troca + comprovante.slice(meio + 1);
+
+      const resultado = await confirmarChegadaCheckin(adulterado);
+
+      expect(resultado).toEqual(recusa);
+      expect(fetchMock).not.toHaveBeenCalled();
+    });
+
+    it("refuses a comprovante issued for another tablet without calling the CRM", async () => {
+      const comprovante = await obterComprovante();
+      definirCookieAcesso(gerarAutorizacao(CHAVE_ACESSO, "dispositivo-2"));
+
+      const resultado = await confirmarChegadaCheckin(comprovante);
+
+      expect(resultado).toEqual(recusa);
+      expect(fetchMock).not.toHaveBeenCalled();
+    });
+
+    it.each([
+      ["undefined", undefined],
+      ["null", null],
+      ["string vazia", ""],
+      ["número", 123],
+      ["objeto", {}],
+      ["texto qualquer", "nao-e-um-comprovante"],
+    ])(
+      "refuses a missing or malformed comprovante (%s) without calling the CRM",
+      async (_r, entrada) => {
+        const resultado = await confirmarChegadaCheckin(entrada as unknown as string);
+
+        expect(resultado).toEqual(recusa);
+        expect(fetchMock).not.toHaveBeenCalled();
+      }
+    );
+
+    it.each([
+      ["sem cookie", () => undefined],
+      ["cookie adulterado", () => `${gerarAutorizacao(CHAVE_ACESSO, "dispositivo-1")}x`],
+      ["cookie de outra chave", () => gerarAutorizacao(OUTRA_CHAVE_ACESSO, "dispositivo-1")],
+    ])("refuses the confirmation with %s without calling the CRM", async (_r, valor) => {
+      const comprovante = await obterComprovante();
+      definirCookieAcesso(valor());
+
+      const resultado = await confirmarChegadaCheckin(comprovante);
+
+      expect(resultado).toEqual(recusa);
+      expect(fetchMock).not.toHaveBeenCalled();
+    });
+
+    it.each(["CRM_API_KEY", "CRM_BASE_URL"])(
+      "refuses a valid comprovante without calling the CRM when %s is empty",
+      async (variavel) => {
+        const comprovante = await obterComprovante();
+        vi.stubEnv(variavel, "");
+
+        const resultado = await confirmarChegadaCheckin(comprovante);
+
+        expect(resultado).toEqual(recusa);
+        expect(fetchMock).not.toHaveBeenCalled();
+      }
+    );
+
+    it("refuses the confirmation when the flag is off, without calling the CRM", async () => {
+      const comprovante = await obterComprovante();
+      vi.stubEnv("CRM_CHECKIN_ENABLED", "false");
+
+      const resultado = await confirmarChegadaCheckin(comprovante);
+
+      expect(resultado).toEqual(recusa);
+      expect(fetchMock).not.toHaveBeenCalled();
+    });
+  });
+
+  describe("Esquema do Cenário: Falha técnica na confirmação", () => {
+    it.each([
+      [
+        "HTTP 401 com Só um instante",
+        () => respostaHttp(respostaConfirmacaoTokenInvalido),
+        undefined,
+      ],
+      ["HTTP 500", () => respostaHttp({ status: 500, corpo: { ok: false } }), undefined],
+      ["tempo esgotado", () => respostaHttp({ status: 500, corpo: {} }), "timeout"],
+      ["erro de rede", () => Promise.reject(new TypeError("fetch failed")), undefined],
+      [
+        "200 sem ok",
+        () => respostaHttp({ status: 200, corpo: { status: "realizada" } }),
+        undefined,
+      ],
+    ])("returns indisponivel with the technical message on %s", async (_r, resposta, modo) => {
+      const comprovante = await obterComprovante();
+      vi.spyOn(console, "warn").mockImplementation(() => {});
+      if (modo === "timeout") {
+        vi.stubEnv("CRM_TIMEOUT_MS", "50");
+        fetchMock.mockImplementation(
+          (_url: unknown, init: { signal: AbortSignal }) =>
+            new Promise((_resolve, reject) => {
+              init.signal.addEventListener("abort", () => reject(init.signal.reason));
+            })
+        );
+      } else {
+        fetchMock.mockImplementation(async () => resposta());
+      }
+
+      const resultado = await confirmarChegadaCheckin(comprovante);
+
+      expect(resultado).toEqual({ tipo: "indisponivel", mensagem: MENSAGEM_ERRO_TECNICO });
+      expect(JSON.stringify(resultado)).not.toContain("Só um instante");
+      expect(fetchMock).toHaveBeenCalledTimes(1);
+    });
+  });
+
+  describe("Cenário: Registro técnico da confirmação sem dados pessoais", () => {
+    it("logs one crm.confirmar line in console.warn on HTTP 500 without phone, name, consulta_id or key", async () => {
+      const comprovante = await obterComprovante();
+      const espioes = (["log", "info", "warn", "error"] as const).map((m) =>
+        vi.spyOn(console, m).mockImplementation(() => {})
+      );
+      fetchMock.mockResolvedValue(respostaHttp({ status: 500, corpo: { ok: false } }));
+
+      await confirmarChegadaCheckin(comprovante);
+
+      const linhas = linhasLogConfirmar([espioes[2]]);
+      expect(linhas).toHaveLength(1);
+      expect(linhas[0]).toMatchObject({
+        evento: "crm.confirmar",
+        operacao: "confirmar",
+        categoria: "tecnico",
+        causa: "status_http",
+        statusHttp: 500,
+      });
+      expect(typeof linhas[0].duracaoMs).toBe("number");
+      expect(linhas[0].correlacao.length).toBeGreaterThan(0);
+      const todas = espioes.flatMap((e) => e.mock.calls).map((a) => JSON.stringify(a));
+      for (const proibido of ["11987654321", "Maria", consultaIdLocalizada, CHAVE]) {
+        expect(todas.filter((l) => l.includes(proibido))).toEqual([]);
+      }
+    });
+
+    it("logs crm.confirmar with console.info on success, without consulta_id", async () => {
+      const comprovante = await obterComprovante();
+      const info = vi.spyOn(console, "info").mockImplementation(() => {});
+      const warn = vi.spyOn(console, "warn").mockImplementation(() => {});
+      fetchMock.mockResolvedValue(respostaHttp(respostaConfirmacaoSucesso));
+
+      await confirmarChegadaCheckin(comprovante);
+
+      const linhas = linhasLogConfirmar([info]);
+      expect(linhas).toHaveLength(1);
+      expect(linhas[0]).toMatchObject({ operacao: "confirmar", statusHttp: 200, ok: true });
+      expect(linhasLogConfirmar([warn])).toEqual([]);
+      expect(JSON.stringify(info.mock.calls)).not.toContain(consultaIdLocalizada);
+    });
+  });
+});
+
+describe("Cenário: O dispositivo não recebe o identificador da consulta", () => {
+  it("returns an opaque comprovante with neither consulta_id nor full name in the response", async () => {
+    fetchMock.mockResolvedValue(respostaHttp(respostaSucesso));
+
+    const resultado = await localizarAgendamentoCheckin("11987654321");
+
+    expect(resultado.tipo).toBe("encontrado");
+    const serializado = JSON.stringify(resultado);
+    expect(serializado).not.toContain(consultaIdLocalizada);
+    expect(serializado).not.toContain("Maria Souza");
+    expect(serializado).not.toContain("Souza");
+    if (resultado.tipo === "encontrado") {
+      expect(resultado.comprovante.length).toBeGreaterThan(0);
+    }
   });
 });
