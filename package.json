@@ -16,19 +16,19 @@
     "test:ui": "vitest --ui",
     "test:coverage": "vitest run --coverage",
     "prepare": "husky",
-    "db:generate": "bunx prisma generate",
-    "db:push": "bunx prisma db push",
-    "db:migrate": "bunx prisma migrate dev",
-    "db:seed": "bunx prisma db seed",
-    "db:studio": "bunx prisma studio",
-    "db:reset": "bunx prisma migrate reset",
+    "db:generate": "prisma generate",
+    "db:push": "prisma db push",
+    "db:migrate": "prisma migrate dev",
+    "db:seed": "prisma db seed",
+    "db:studio": "prisma studio",
+    "db:reset": "prisma migrate reset",
     "podman:up": "podman compose up -d",
     "podman:down": "podman compose down",
     "podman:reset": "podman compose down -v",
     "podman:logs": "podman compose logs -f postgres"
   },
   "prisma": {
-    "seed": "bun prisma/seed.ts"
+    "seed": "tsx prisma/seed.ts"
   },
   "dependencies": {
     "@hookform/resolvers": "^3.10.0",
@@ -86,6 +86,7 @@
     "prettier-plugin-tailwindcss": "^0.6.11",
     "prisma": "^6.5.0",
     "tailwindcss": "^4",
+    "tsx": "^4.23.15",
     "typescript": "^5",
     "vitest": "^3.1.1"
   },
@@ -98,13 +99,14 @@
       "prettier --write"
     ]
   },
-  "ignoreScripts": [
-    "sharp",
-    "unrs-resolver"
-  ],
-  "trustedDependencies": [
-    "sharp",
-    "unrs-resolver",
-    "prisma"
-  ]
+  "pnpm": {
+    "onlyBuiltDependencies": [
+      "@prisma/client",
+      "@prisma/engines",
+      "prisma",
+      "sharp",
+      "unrs-resolver"
+    ]
+  },
+  "packageManager": "pnpm@10.34.6"
 }
