@@ -49,7 +49,7 @@ O paciente toca em "Tenho consulta agendada" na tela inicial da versão de teste
 - **E9 · Inatividade** (passos 2, 3, 6, A5 ou telas de E1 a E6): depois de 30 s sem toque, o sistema volta ao início e descarta telefone e dados. [S]
 - **E10 · Excesso de tentativas no dispositivo** (passo 5): depois de 10 buscas no mesmo minuto (RNF-001.4), a busca é recusada sem consultar o CRM e o paciente vê a mensagem padrão de erro técnico. [C]
 - **E11 · Dois toques seguidos em "Buscar"** (passo 3): só uma consulta é enviada. [S]
-- **E12 · Acesso não autorizado à versão de teste** (antes do passo 1): sem a chave de acesso no primeiro acesso, o totem de teste não é exibido (RNF-001.4). [C]
+- **E12 · Acesso não autorizado à versão de teste** (antes do passo 1): o tablet que nunca passou pela tela de ativação com a chave de acesso não vê o totem de teste; o endereço responde como página inexistente (RNF-001.4). [C]
 
 ## Pós-condições
 

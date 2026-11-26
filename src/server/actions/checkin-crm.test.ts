@@ -7,13 +7,33 @@ import {
 import { MENSAGEM_ERRO_TECNICO, MENSAGEM_TELEFONE_INVALIDO } from "@/lib/crm/mensagens";
 
 vi.mock("server-only", () => ({}));
+vi.mock("next/headers", () => ({ cookies: vi.fn() }));
 
-import { localizarAgendamentoCheckin } from "./checkin-crm";
+import { cookies } from "next/headers";
+import {
+  NOME_COOKIE_ACESSO,
+  VALIDADE_ACESSO_SEGUNDOS,
+  gerarAutorizacao,
+  validarAutorizacao,
+} from "@/lib/crm/acesso";
+import { limitadorBuscas } from "@/lib/crm/limitador";
+import { MENSAGEM_CHAVE_INVALIDA } from "@/lib/crm/mensagens";
+import { ativarTotemCheckin, localizarAgendamentoCheckin } from "./checkin-crm";
 
 const URL_BASE = "https://crm.exemplo.test/functions/v1";
 const CHAVE = "chave-de-teste";
+const CHAVE_ACESSO = "chave-de-acesso-de-teste-com-32-caracteres-ou-mais";
+const OUTRA_CHAVE_ACESSO = "outra-chave-de-acesso-de-teste-com-32-caracteres";
 
 const fetchMock = vi.fn();
+const cookieGet = vi.fn();
+const cookieSet = vi.fn();
+
+function definirCookieAcesso(valor: string | undefined) {
+  cookieGet.mockImplementation((nome: string) =>
+    nome === NOME_COOKIE_ACESSO && valor !== undefined ? { name: nome, value: valor } : undefined
+  );
+}
 
 function respostaHttp({ status, corpo }: { status: number; corpo: unknown }) {
   return new Response(JSON.stringify(corpo), {
@@ -26,12 +46,18 @@ function configurarAmbienteLigado() {
   vi.stubEnv("CRM_CHECKIN_ENABLED", "true");
   vi.stubEnv("CRM_BASE_URL", URL_BASE);
   vi.stubEnv("CRM_API_KEY", CHAVE);
+  vi.stubEnv("CRM_CHECKIN_ACCESS_KEY", CHAVE_ACESSO);
 }
 
 beforeEach(() => {
   fetchMock.mockReset();
   vi.stubGlobal("fetch", fetchMock);
   configurarAmbienteLigado();
+  cookieGet.mockReset();
+  cookieSet.mockReset();
+  vi.mocked(cookies).mockResolvedValue({ get: cookieGet, set: cookieSet } as never);
+  definirCookieAcesso(gerarAutorizacao(CHAVE_ACESSO, "dispositivo-1"));
+  limitadorBuscas.reiniciar();
 });
 
 afterEach(() => {
@@ -204,5 +230,179 @@ describe("localizarAgendamentoCheckin", () => {
         mensagem: MENSAGEM_ERRO_TECNICO,
       });
     });
+  });
+
+  describe("Cenário: Busca chamada diretamente sem autorização", () => {
+    it.each([
+      ["sem cookie", () => undefined],
+      ["cookie adulterado", () => `${gerarAutorizacao(CHAVE_ACESSO, "dispositivo-1")}x`],
+      ["cookie lixo", () => "valor-qualquer"],
+      ["cookie de outra chave", () => gerarAutorizacao(OUTRA_CHAVE_ACESSO, "dispositivo-1")],
+    ])("returns indisponivel without calling the CRM with %s", async (_rotulo, valor) => {
+      definirCookieAcesso(valor());
+
+      const resultado = await localizarAgendamentoCheckin("11987654321");
+
+      expect(resultado).toEqual({ tipo: "indisponivel", mensagem: MENSAGEM_ERRO_TECNICO });
+      expect(fetchMock).not.toHaveBeenCalled();
+    });
+  });
+
+  describe("Cenário: Limite de buscas por minuto", () => {
+    it("returns indisponivel without calling the CRM on the 11th search of the same device", async () => {
+      fetchMock.mockImplementation(async () => respostaHttp(respostaSucesso));
+
+      for (let i = 0; i < 10; i++) {
+        const ok = await localizarAgendamentoCheckin("11987654321");
+        expect(ok.tipo).toBe("encontrado");
+      }
+      const resultado = await localizarAgendamentoCheckin("11987654321");
+
+      expect(resultado).toEqual({ tipo: "indisponivel", mensagem: MENSAGEM_ERRO_TECNICO });
+      expect(fetchMock).toHaveBeenCalledTimes(10);
+    });
+
+    it("still allows another device after the first one hit the limit", async () => {
+      fetchMock.mockImplementation(async () => respostaHttp(respostaSucesso));
+      for (let i = 0; i < 11; i++) await localizarAgendamentoCheckin("11987654321");
+      definirCookieAcesso(gerarAutorizacao(CHAVE_ACESSO, "dispositivo-2"));
+
+      const resultado = await localizarAgendamentoCheckin("11987654321");
+
+      expect(resultado.tipo).toBe("encontrado");
+    });
+
+    it("does not consume the limit when the phone is invalid", async () => {
+      fetchMock.mockImplementation(async () => respostaHttp(respostaSucesso));
+      for (let i = 0; i < 15; i++) {
+        const invalido = await localizarAgendamentoCheckin("123");
+        expect(invalido.tipo).toBe("telefone_invalido");
+      }
+
+      for (let i = 0; i < 10; i++) {
+        const ok = await localizarAgendamentoCheckin("11987654321");
+        expect(ok.tipo).toBe("encontrado");
+      }
+    });
+  });
+});
+
+describe("ativarTotemCheckin", () => {
+  describe("Cenário: Ativação com a chave certa", () => {
+    it("sets the authorization cookie with restrictive options and returns ok", async () => {
+      const resultado = await ativarTotemCheckin(CHAVE_ACESSO);
+
+      expect(resultado).toEqual({ ok: true });
+      expect(cookieSet).toHaveBeenCalledTimes(1);
+      const [nome, valor, opcoes] = cookieSet.mock.calls[0];
+      expect(nome).toBe("totem_crm_acesso");
+      expect(typeof valor).toBe("string");
+      expect(opcoes).toEqual({
+        httpOnly: true,
+        sameSite: "lax",
+        path: "/recepcao-crm",
+        maxAge: VALIDADE_ACESSO_SEGUNDOS,
+        secure: false,
+      });
+    });
+
+    it("marks the cookie as secure in production", async () => {
+      vi.stubEnv("NODE_ENV", "production");
+
+      await ativarTotemCheckin(CHAVE_ACESSO);
+
+      expect(cookieSet.mock.calls[0][2].secure).toBe(true);
+    });
+
+    it("stores a value that does not contain the access key and is accepted by validarAutorizacao", async () => {
+      await ativarTotemCheckin(CHAVE_ACESSO);
+
+      const valor = cookieSet.mock.calls[0][1] as string;
+      expect(valor).not.toContain(CHAVE_ACESSO);
+      expect(validarAutorizacao(valor, CHAVE_ACESSO)).not.toBeNull();
+    });
+  });
+
+  describe("Cenário: Ativação com chave inválida", () => {
+    it.each([
+      ["chave errada", "chave-errada-chave-errada-chave-errada-xx"],
+      ["chave vazia", ""],
+      ["undefined", undefined],
+      ["null", null],
+      ["número", 123],
+      ["objeto", {}],
+    ])("returns invalid-key message and sets no cookie for %s", async (_rotulo, entrada) => {
+      const resultado = await ativarTotemCheckin(entrada as unknown as string);
+
+      expect(resultado).toEqual({ ok: false, mensagem: MENSAGEM_CHAVE_INVALIDA });
+      expect(resultado).toMatchObject({ mensagem: "Chave de acesso inválida." });
+      expect(cookieSet).not.toHaveBeenCalled();
+    });
+  });
+
+  describe("Cenário: Totem desligado ou chave de acesso não configurada", () => {
+    it.each([
+      ["flag false", () => vi.stubEnv("CRM_CHECKIN_ENABLED", "false")],
+      ["flag ausente", () => vi.stubEnv("CRM_CHECKIN_ENABLED", "")],
+      ["chave de acesso ausente", () => vi.stubEnv("CRM_CHECKIN_ACCESS_KEY", "")],
+      [
+        "chave de acesso com 31 caracteres",
+        () => vi.stubEnv("CRM_CHECKIN_ACCESS_KEY", "a".repeat(31)),
+      ],
+    ])("returns technical message and sets no cookie when %s", async (_rotulo, configurar) => {
+      configurar();
+
+      const resultado = await ativarTotemCheckin(CHAVE_ACESSO);
+
+      expect(resultado).toEqual({ ok: false, mensagem: MENSAGEM_ERRO_TECNICO });
+      expect(cookieSet).not.toHaveBeenCalled();
+    });
+
+    it("accepts an access key of exactly 32 characters", async () => {
+      const chave32 = "a".repeat(32);
+      vi.stubEnv("CRM_CHECKIN_ACCESS_KEY", chave32);
+
+      const resultado = await ativarTotemCheckin(chave32);
+
+      expect(resultado).toEqual({ ok: true });
+    });
+  });
+});
+
+describe("ativarTotemCheckin - bordas e ciclo completo", () => {
+  it("rejects an access key longer than 256 characters without setting the cookie", async () => {
+    const resultado = await ativarTotemCheckin(CHAVE_ACESSO + "x".repeat(257));
+
+    expect(resultado).toEqual({ ok: false, mensagem: MENSAGEM_CHAVE_INVALIDA });
+    expect(cookieSet).not.toHaveBeenCalled();
+  });
+
+  it("the cookie issued by ativarTotemCheckin is accepted by localizarAgendamentoCheckin", async () => {
+    cookieGet.mockReset();
+    definirCookieAcesso(undefined);
+    fetchMock.mockImplementation(async () => respostaHttp(respostaSucesso));
+    await ativarTotemCheckin(CHAVE_ACESSO);
+    const valorEmitido = cookieSet.mock.calls[0][1] as string;
+    definirCookieAcesso(valorEmitido);
+
+    const resultado = await localizarAgendamentoCheckin("11987654321");
+
+    expect(resultado.tipo).toBe("encontrado");
+    expect(fetchMock).toHaveBeenCalledTimes(1);
+  });
+
+  it("does not log the access key", async () => {
+    const espioes = (["log", "info", "warn", "error"] as const).map((m) =>
+      vi.spyOn(console, m).mockImplementation(() => {})
+    );
+    fetchMock.mockImplementation(async () => respostaHttp(respostaSucesso));
+
+    await ativarTotemCheckin(CHAVE_ACESSO);
+    await ativarTotemCheckin("chave-errada-chave-errada-chave-errada-xx");
+    await localizarAgendamentoCheckin("11987654321");
+
+    const registrado = espioes.flatMap((e) => e.mock.calls).map((args) => JSON.stringify(args));
+    espioes.forEach((e) => e.mockRestore());
+    expect(registrado.filter((linha) => linha.includes(CHAVE_ACESSO))).toEqual([]);
   });
 });
