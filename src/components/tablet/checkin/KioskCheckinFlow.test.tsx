@@ -9,6 +9,7 @@ type Resultado =
   | {
       tipo: "encontrado";
       agendamento: { primeiroNome: string; hora: string; profissional: string };
+      comprovante: string;
     }
   | { tipo: "telefone_invalido"; mensagem: string }
   | { tipo: "indisponivel"; mensagem: string }
@@ -24,6 +25,7 @@ type Resultado =
 
 const mocks = vi.hoisted(() => ({
   localizarAgendamentoCheckin: vi.fn(),
+  confirmarChegadaCheckin: vi.fn(),
   registrarEEntrarNaFila: vi.fn(),
   falar: vi.fn(),
   parar: vi.fn(),
@@ -31,6 +33,7 @@ const mocks = vi.hoisted(() => ({
 
 vi.mock("@/server/actions/checkin-crm", () => ({
   localizarAgendamentoCheckin: mocks.localizarAgendamentoCheckin,
+  confirmarChegadaCheckin: mocks.confirmarChegadaCheckin,
 }));
 
 vi.mock("@/server/actions/atendimento", () => ({
@@ -94,6 +97,7 @@ const MARIA: Resultado = {
     hora: "14:00",
     profissional: "Ana Lima",
   },
+  comprovante: "comprovante-opaco",
 };
 
 const MENSAGEM_CONFIRMACAO =
@@ -778,6 +782,148 @@ describe(
 
       expect(screen.getByLabelText("Seu nome")).toBeInTheDocument();
       expect(estaNoInicio()).toBe(false);
+    });
+
+    describe("confirmação da chegada no CRM", () => {
+      const MSG_SUCESSO =
+        "Obrigado, Maria! Sua chegada foi registrada. Aguarde, você será chamado(a) em breve.";
+      const MSG_JA_REGISTRADA = "Sua chegada já foi registrada.";
+      const MSG_NAO_ENCONTRADA = "Não encontrei essa consulta.";
+
+      async function irParaConfirmacaoRapido() {
+        await buscarCom(MARIA);
+        screen.getByText(MENSAGEM_CONFIRMACAO);
+      }
+
+      async function confirmarChegada() {
+        const confirmar = screen.getByText("Confirmar chegada", { selector: "button" });
+        await act(async () => {
+          fireEvent.click(confirmar);
+        });
+      }
+
+      async function confirmarCom(resposta: unknown) {
+        mocks.confirmarChegadaCheckin.mockResolvedValue(resposta);
+        await irParaConfirmacaoRapido();
+        await confirmarChegada();
+      }
+
+      it("sends the opaque receipt and shows the registering message while waiting (Chegada confirmada)", async () => {
+        mocks.confirmarChegadaCheckin.mockReturnValue(new Promise(() => {}));
+        await irParaConfirmacaoRapido();
+
+        await confirmarChegada();
+
+        expect(mocks.confirmarChegadaCheckin).toHaveBeenCalledWith("comprovante-opaco");
+        expect(screen.getByText("Registrando sua chegada...")).toBeInTheDocument();
+      });
+
+      it("shows the CRM message in a status when arrival is confirmed (Chegada confirmada)", async () => {
+        await confirmarCom({ tipo: "chegada_registrada", mensagem: MSG_SUCESSO });
+
+        expect(screen.getByRole("status")).toHaveTextContent(MSG_SUCESSO);
+        expect(botao("Confirmar chegada")).not.toBeInTheDocument();
+      });
+
+      it("returns to idle exactly 10 s after the arrival is confirmed (Chegada confirmada)", async () => {
+        await confirmarCom({ tipo: "chegada_registrada", mensagem: MSG_SUCESSO });
+
+        await avancar(9_999);
+        expect(screen.getByRole("status")).toHaveTextContent(MSG_SUCESSO);
+        expect(estaNoInicio()).toBe(false);
+
+        await avancar(1);
+        expect(estaNoInicio()).toBe(true);
+      });
+
+      it("shows the already-registered message as success (Chegada já registrada na confirmação)", async () => {
+        await confirmarCom({ tipo: "chegada_registrada", mensagem: MSG_JA_REGISTRADA });
+
+        expect(screen.getByRole("status")).toHaveTextContent(MSG_JA_REGISTRADA);
+        expect(screen.queryByRole("alert")).not.toBeInTheDocument();
+      });
+
+      it("calls the confirmation only once on two taps in the same tick (Dois toques seguidos em Confirmar chegada)", async () => {
+        mocks.confirmarChegadaCheckin.mockReturnValue(new Promise(() => {}));
+        await irParaConfirmacaoRapido();
+        const confirmar = screen.getByText("Confirmar chegada", { selector: "button" });
+
+        fireEvent.click(confirmar);
+        fireEvent.click(confirmar);
+
+        expect(mocks.confirmarChegadaCheckin).toHaveBeenCalledTimes(1);
+      });
+
+      it("shows only Voltar ao início when the appointment is not found (Consulta não encontrada na confirmação)", async () => {
+        await confirmarCom({ tipo: "nao_encontrada", mensagem: MSG_NAO_ENCONTRADA });
+
+        expect(screen.getByRole("alert")).toHaveTextContent(MSG_NAO_ENCONTRADA);
+        expect(botao("Voltar ao início")).toBeInTheDocument();
+        expect(botao("Tentar outro telefone")).not.toBeInTheDocument();
+        expect(botao("Falar com um profissional")).not.toBeInTheDocument();
+      });
+
+      it("shows only Voltar ao início on a blocking answer in the confirmation", async () => {
+        await confirmarCom({ tipo: "impedimento", mensagem: MSG.impedimento });
+
+        expect(screen.getByRole("alert")).toHaveTextContent(MSG.impedimento);
+        expect(botao("Voltar ao início")).toBeInTheDocument();
+        expect(botao("Tentar outro telefone")).not.toBeInTheDocument();
+        expect(botao("Falar com um profissional")).not.toBeInTheDocument();
+      });
+
+      it("returns to idle exactly 15 s after a technical answer (Falha técnica na confirmação)", async () => {
+        await confirmarCom({ tipo: "indisponivel", mensagem: MENSAGEM_INDISPONIVEL });
+        expect(screen.getByRole("alert")).toHaveTextContent(MENSAGEM_INDISPONIVEL);
+
+        await avancar(14_999);
+        expect(screen.getByRole("alert")).toHaveTextContent(MENSAGEM_INDISPONIVEL);
+        expect(estaNoInicio()).toBe(false);
+
+        await avancar(1);
+        expect(estaNoInicio()).toBe(true);
+      });
+
+      it("shows the technical screen and returns to idle at 15 s when the confirmation call rejects (Falha técnica na confirmação)", async () => {
+        mocks.confirmarChegadaCheckin.mockRejectedValue(new Error("network"));
+        await irParaConfirmacaoRapido();
+        await confirmarChegada();
+
+        expect(screen.getByRole("alert")).toHaveTextContent(MENSAGEM_INDISPONIVEL);
+        await avancar(14_999);
+        expect(estaNoInicio()).toBe(false);
+        await avancar(1);
+        expect(estaNoInicio()).toBe(true);
+      });
+
+      it("never speaks the typed phone on the arrival-registered screen (RF-001.21)", async () => {
+        await confirmarCom({ tipo: "chegada_registrada", mensagem: MSG_SUCESSO });
+
+        const textos = mocks.falar.mock.calls.map((c) => String(c[0]));
+        expect(textos.some((t) => t.includes("Obrigado"))).toBe(true);
+        for (const t of textos) {
+          expect(t).not.toContain("11900000000");
+          expect(t).not.toContain("90000");
+        }
+      });
+
+      it("discards the previous receipt and sends the new one on a later confirmation", async () => {
+        await confirmarCom({ tipo: "chegada_registrada", mensagem: MSG_SUCESSO });
+        await avancar(10_000);
+        expect(estaNoInicio()).toBe(true);
+
+        mocks.localizarAgendamentoCheckin.mockResolvedValue({
+          ...MARIA,
+          comprovante: "comprovante-novo",
+        });
+        await abrirTelefone();
+        digitar("11900000000");
+        await buscar();
+        await confirmarChegada();
+
+        expect(mocks.confirmarChegadaCheckin).toHaveBeenCalledTimes(2);
+        expect(mocks.confirmarChegadaCheckin).toHaveBeenLastCalledWith("comprovante-novo");
+      });
     });
   }
 );

@@ -3,8 +3,6 @@ import { prismaAdapter } from "better-auth/adapters/prisma";
 import { admin } from "better-auth/plugins";
 import { prisma } from "@/lib/prisma";
 import { nextCookies } from "better-auth/next-js";
-import { sendEmail, sendPasswordResetEmail } from "@/lib/email/service";
-import { emailConfig } from "@/lib/email/config";
 import { betterAuthEmailAdapter } from "./email";
 
 // ================================================================

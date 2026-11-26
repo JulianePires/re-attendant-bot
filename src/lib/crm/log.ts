@@ -1,11 +1,12 @@
 import "server-only";
 
-import type { CategoriaMotivo, ResultadoLocalizacao } from "./contrato";
+import type { CategoriaMotivo, CategoriaMotivoConfirmacao, ResultadoLocalizacao } from "./contrato";
 
 type CausaTecnica = Extract<ResultadoLocalizacao, { tipo: "tecnico" }>["causa"];
 
-type DadosLocalizacao = {
-  categoria: CategoriaMotivo | "encontrado" | "tecnico";
+type DadosChamadaCrm = {
+  operacao: "localizar" | "confirmar";
+  categoria: CategoriaMotivo | CategoriaMotivoConfirmacao | "encontrado" | "confirmado" | "tecnico";
   causa?: CausaTecnica;
   motivo?: string;
   desconhecido: boolean;
@@ -16,15 +17,15 @@ type DadosLocalizacao = {
 };
 
 /**
- * Registro técnico de cada localização no CRM (RNF-001.6), uma linha JSON.
- * Só os campos abaixo saem: nada de telefone, nome, procedimento ou chave (RNF-001.5),
- * mesmo que o chamador passe um objeto maior. Erro técnico e motivo desconhecido
- * vão em `warn` para chamar atenção.
+ * Registro técnico de cada chamada ao CRM (RNF-001.6), uma linha JSON.
+ * Só os campos abaixo saem: nada de telefone, nome, procedimento, consulta_id ou chave
+ * (RNF-001.5), mesmo que o chamador passe um objeto maior. Erro técnico e motivo
+ * desconhecido vão em `warn` para chamar atenção.
  */
-export function registrarLocalizacao(dados: DadosLocalizacao): void {
+export function registrarChamadaCrm(dados: DadosChamadaCrm): void {
   const linha = JSON.stringify({
-    evento: "crm.localizar",
-    operacao: "localizar",
+    evento: `crm.${dados.operacao}`,
+    operacao: dados.operacao,
     categoria: dados.categoria,
     causa: dados.causa,
     motivo: dados.motivo,

@@ -1,9 +1,20 @@
 import { describe, expect, it } from "vitest";
 import {
   classificarMotivo,
+  classificarMotivoConfirmacao,
+  interpretarRespostaConfirmar,
   interpretarRespostaLocalizar,
+  montarRequisicaoConfirmar,
   montarRequisicaoLocalizar,
 } from "./contrato";
+import {
+  consultaIdLocalizada,
+  respostaConfirmacaoDadosInvalidos,
+  respostaConfirmacaoJaRegistrado,
+  respostaConfirmacaoNaoEncontrada,
+  respostaConfirmacaoSucesso,
+  respostaConfirmacaoTokenInvalido,
+} from "./__fixtures__/confirmar";
 import {
   respostaPacienteNaoEncontrado,
   respostaSucesso,
@@ -49,6 +60,7 @@ describe("interpretarRespostaLocalizar", () => {
         tipo: "encontrado",
         agendamento: {
           consultaId: "3f1c2b9a-6d4e-4f8a-9b7c-2e5d1a0f8c34",
+          nome: "Maria Souza",
           primeiroNome: "Maria",
           hora: "14:00",
           profissional: "Ana Lima",
@@ -56,11 +68,21 @@ describe("interpretarRespostaLocalizar", () => {
       });
     });
 
-    it("não leva procedimento, nome completo nem mensagem do CRM", () => {
+    it("usa o primeiro nome quando o CRM não manda o nome completo", () => {
+      const semNome: Record<string, unknown> = { ...respostaSucesso.corpo };
+      delete semNome.nome;
+      const ausente = interpretarRespostaLocalizar(200, semNome);
+      const branco = interpretarRespostaLocalizar(200, { ...respostaSucesso.corpo, nome: "  " });
+      for (const r of [ausente, branco]) {
+        expect(r.tipo).toBe("encontrado");
+        if (r.tipo === "encontrado") expect(r.agendamento.nome).toBe("Maria");
+      }
+    });
+
+    it("não leva procedimento nem mensagem do CRM", () => {
       const r = interpretarRespostaLocalizar(respostaSucesso.status, respostaSucesso.corpo);
       const texto = JSON.stringify(r);
       expect(texto).not.toContain("Pilates");
-      expect(texto).not.toContain("Souza");
       expect(texto).not.toContain("Cássio");
     });
   });
@@ -191,6 +213,119 @@ describe("classificarMotivo: nomes do protótipo de objeto", () => {
     "treats prototype name %s as desconhecido",
     (motivo) => {
       expect(classificarMotivo(motivo)).toBe("desconhecido");
+    }
+  );
+});
+
+describe("montarRequisicaoConfirmar", () => {
+  it("monta a url de confirmação a partir da base", () => {
+    const { url } = montarRequisicaoConfirmar(config, consultaIdLocalizada);
+    expect(url).toBe("https://crm.exemplo.test/agenda/confirmar");
+  });
+
+  it("não duplica a barra quando a base termina com barra", () => {
+    const { url } = montarRequisicaoConfirmar(
+      { ...config, baseUrl: "https://crm.exemplo.test/" },
+      consultaIdLocalizada
+    );
+    expect(url).toBe("https://crm.exemplo.test/agenda/confirmar");
+  });
+
+  it("usa POST com os cabeçalhos x-api-key e Content-Type", () => {
+    const { init } = montarRequisicaoConfirmar(config, consultaIdLocalizada);
+    expect(init.method).toBe("POST");
+    const headers = new Headers(init.headers);
+    expect(headers.get("x-api-key")).toBe("chave-de-teste");
+    expect(headers.get("Content-Type")).toBe("application/json");
+  });
+
+  it("envia somente consulta_id no corpo JSON", () => {
+    const { init } = montarRequisicaoConfirmar(config, consultaIdLocalizada);
+    expect(JSON.parse(String(init.body))).toEqual({ consulta_id: consultaIdLocalizada });
+  });
+});
+
+describe("interpretarRespostaConfirmar (tabela de decisão status x corpo)", () => {
+  it("200 + ok:true vira confirmado com status e mensagem", () => {
+    const f = respostaConfirmacaoSucesso;
+    expect(interpretarRespostaConfirmar(f.status, f.corpo)).toEqual({
+      tipo: "confirmado",
+      status: "realizada",
+      mensagem: f.corpo.mensagem,
+    });
+  });
+
+  it("200 + ok:true sem mensagem é confirmado com mensagem ausente", () => {
+    const r = interpretarRespostaConfirmar(200, { ok: true, status: "realizada" });
+    expect(r.tipo).toBe("confirmado");
+    if (r.tipo === "confirmado") {
+      expect(r.status).toBe("realizada");
+      expect(r.mensagem).toBeUndefined();
+    }
+  });
+
+  it.each([
+    ["ja_registrado", respostaConfirmacaoJaRegistrado],
+    ["nao_encontrada", respostaConfirmacaoNaoEncontrada],
+    ["dados_invalidos", respostaConfirmacaoDadosInvalidos],
+  ])("200 + ok:false %s é negócio com motivo e mensagem", (motivo, fixture) => {
+    expect(interpretarRespostaConfirmar(fixture.status, fixture.corpo)).toEqual({
+      tipo: "negocio",
+      motivo,
+      mensagem: fixture.corpo.mensagem,
+    });
+  });
+
+  it("401 + token_invalido é técnico/status_http", () => {
+    const f = respostaConfirmacaoTokenInvalido;
+    expect(interpretarRespostaConfirmar(f.status, f.corpo)).toEqual({
+      tipo: "tecnico",
+      causa: "status_http",
+    });
+  });
+
+  it.each([400, 404, 500, 503, 199, 300])(
+    "status %i com corpo de sucesso é técnico/status_http",
+    (status) => {
+      expect(interpretarRespostaConfirmar(status, respostaConfirmacaoSucesso.corpo)).toEqual({
+        tipo: "tecnico",
+        causa: "status_http",
+      });
+    }
+  );
+
+  it.each([
+    ["null", null],
+    ["string", "ok"],
+    ["sem ok", { status: "realizada" }],
+    ["ok true sem status", { ok: true }],
+    ["ok true com status vazio", { ok: true, status: "" }],
+    ["ok true com status não string", { ok: true, status: 1 }],
+    ["ok false sem motivo", { ok: false }],
+  ])("200 + corpo %s é técnico/resposta_invalida", (_nome, corpo) => {
+    expect(interpretarRespostaConfirmar(200, corpo)).toEqual({
+      tipo: "tecnico",
+      causa: "resposta_invalida",
+    });
+  });
+});
+
+describe("classificarMotivoConfirmacao", () => {
+  it.each([
+    ["ja_registrado", "ja_registrado"],
+    ["nao_encontrada", "nao_encontrada"],
+    ["dados_invalidos", "desconhecido"],
+    ["paciente_nao_encontrado", "desconhecido"],
+    ["", "desconhecido"],
+    ["JA_REGISTRADO", "desconhecido"],
+  ])("classifica o motivo %j como %s", (motivo, categoria) => {
+    expect(classificarMotivoConfirmacao(motivo)).toBe(categoria);
+  });
+
+  it.each(["toString", "__proto__", "constructor"])(
+    "treats prototype name %s as desconhecido",
+    (motivo) => {
+      expect(classificarMotivoConfirmacao(motivo)).toBe("desconhecido");
     }
   );
 });

@@ -1,5 +1,7 @@
 import { describe, expect, it } from "vitest";
 import {
+  MENSAGEM_CHEGADA_CONFIRMADA,
+  TEXTO_PADRAO_CONFIRMACAO,
   MENSAGEM_ERRO_TECNICO,
   MENSAGEM_PROFISSIONAL_CHAMADO,
   MENSAGEM_TELEFONE_INVALIDO,
@@ -63,6 +65,24 @@ describe("TEXTO_PADRAO_POR_CATEGORIA", () => {
       ja_registrado: "Sua chegada já estava registrada. Aguarde, você será chamado(a) em breve.",
       desconhecido: "Não foi possível continuar seu check-in. Por favor, procure a recepção.",
     });
+  });
+});
+
+describe("TEXTO_PADRAO_CONFIRMACAO", () => {
+  it("expõe exatamente os textos padrão da confirmação", () => {
+    expect(TEXTO_PADRAO_CONFIRMACAO).toEqual({
+      ja_registrado: "Sua chegada já estava registrada. Aguarde, você será chamado(a) em breve.",
+      nao_encontrada: "Não encontrei essa consulta.",
+      desconhecido: "Não foi possível continuar seu check-in. Por favor, procure a recepção.",
+    });
+  });
+});
+
+describe("MENSAGEM_CHEGADA_CONFIRMADA", () => {
+  it("expõe a mensagem de chegada registrada", () => {
+    expect(MENSAGEM_CHEGADA_CONFIRMADA).toBe(
+      "Sua chegada foi registrada. Aguarde, você será chamado(a) em breve."
+    );
   });
 });
 

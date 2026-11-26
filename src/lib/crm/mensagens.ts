@@ -30,6 +30,18 @@ export function montarNotificacaoSemAgendamento(nome: string): string {
   return `Sem agendamento: ${nome} quer falar com um profissional`;
 }
 
+// Confirmação de chegada (UC-002): textos padrão quando o CRM não manda `mensagem`.
+export const MENSAGEM_CHEGADA_CONFIRMADA =
+  "Sua chegada foi registrada. Aguarde, você será chamado(a) em breve.";
+
+export const TEXTO_PADRAO_CONFIRMACAO = {
+  ja_registrado: TEXTO_PADRAO_POR_CATEGORIA.ja_registrado,
+  nao_encontrada: "Não encontrei essa consulta.",
+  desconhecido: TEXTO_PADRAO_POR_CATEGORIA.desconhecido,
+} as const;
+
+export const FALA_REGISTRANDO = "Um momento, estou registrando sua chegada.";
+
 export const FALA_PEDIR_TELEFONE = "Digite seu telefone com DDD e toque em buscar.";
 
 export const FALA_BOAS_VINDAS =
