@@ -1,7 +1,6 @@
 import { cleanup, fireEvent, render, screen, waitFor } from "@testing-library/react";
 import userEvent from "@testing-library/user-event";
-import { createElement, Fragment, type ReactNode } from "react";
-import { act } from "react";
+import { act, createElement, Fragment, type ReactNode } from "react";
 import { afterEach, beforeEach, describe, expect, it, vi } from "vitest";
 
 import { KioskCheckinFlow } from "./KioskCheckinFlow";
@@ -90,7 +89,11 @@ vi.mock("framer-motion", () => {
 
 const MARIA: Resultado = {
   tipo: "encontrado",
-  agendamento: { primeiroNome: "Maria", hora: "14:00", profissional: "Ana Lima" },
+  agendamento: {
+    primeiroNome: "Maria",
+    hora: "14:00",
+    profissional: "Ana Lima",
+  },
 };
 
 const MENSAGEM_CONFIRMACAO =
@@ -361,370 +364,420 @@ describe("KioskCheckinFlow", { timeout: 15000 }, () => {
   });
 });
 
-describe("KioskCheckinFlow: respostas sem agendamento e inatividade", { timeout: 15000 }, () => {
-  const MSG = {
-    nao_encontrado: "Não encontrei nenhum cadastro com esse número.",
-    fora_da_janela: "Sua consulta é às 17:00. O check-in abre às 16:00.",
-    sem_agendamento: "Não encontrei agendamento para agora.",
-    chegada_ja_registrada: "Sua chegada já foi registrada.",
-    impedimento: "Faltou alguma informação para eu concluir.",
-  } as const;
+describe(
+  "KioskCheckinFlow: respostas sem agendamento e inatividade",
+  {
+    timeout: 15000,
+  },
+  () => {
+    const MSG = {
+      nao_encontrado: "Não encontrei nenhum cadastro com esse número.",
+      fora_da_janela: "Sua consulta é às 17:00. O check-in abre às 16:00.",
+      sem_agendamento: "Não encontrei agendamento para agora.",
+      chegada_ja_registrada: "Sua chegada já foi registrada.",
+      impedimento: "Faltou alguma informação para eu concluir.",
+    } as const;
 
-  const botao = (nome: string) => screen.queryByRole("button", { name: nome, hidden: true });
+    const botao = (nome: string) => screen.queryByRole("button", { name: nome, hidden: true });
 
-  // Helpers rápidos: texto + seletor, sem calcular papéis de todos os botões.
-  async function tocar(nome: string) {
-    fireEvent.click(screen.getByText(nome, { selector: "button" }));
-  }
+    // Helpers rápidos: texto + seletor, sem calcular papéis de todos os botões.
+    async function tocar(nome: string) {
+      fireEvent.click(screen.getByText(nome, { selector: "button" }));
+    }
 
-  // A promessa da action resolve dentro de act: o React renderiza sem depender do agendador preso aos timers falsos.
-  async function buscar() {
-    const botaoBuscar = screen.getByText("Buscar", { selector: "button" });
-    await act(async () => {
-      fireEvent.click(botaoBuscar);
-    });
-  }
+    // A promessa da action resolve dentro de act: o React renderiza sem depender do agendador preso aos timers falsos.
+    async function buscar() {
+      const botaoBuscar = screen.getByText("Buscar", { selector: "button" });
+      await act(async () => {
+        fireEvent.click(botaoBuscar);
+      });
+    }
 
-  async function abrirTelefone() {
-    await tocar("Toque para iniciar");
-    await tocar("Tenho consulta agendada");
-    screen.getByText(/Informe seu telefone/);
-  }
+    async function abrirTelefone() {
+      await tocar("Toque para iniciar");
+      await tocar("Tenho consulta agendada");
+      screen.getByText(/Informe seu telefone/);
+    }
 
-  function digitar(digitos: string) {
-    for (const d of digitos) fireEvent.click(screen.getByText(d, { selector: "button" }));
-  }
+    function digitar(digitos: string) {
+      for (const d of digitos) fireEvent.click(screen.getByText(d, { selector: "button" }));
+    }
 
-  async function buscarCom(resultado: Resultado) {
-    mocks.localizarAgendamentoCheckin.mockResolvedValue(resultado);
-    render(<KioskCheckinFlow />);
-    await abrirTelefone();
-    digitar("11900000000");
-    await buscar();
-  }
+    async function buscarCom(resultado: Resultado) {
+      mocks.localizarAgendamentoCheckin.mockResolvedValue(resultado);
+      render(<KioskCheckinFlow />);
+      await abrirTelefone();
+      digitar("11900000000");
+      await buscar();
+    }
 
-  async function avancar(ms: number) {
-    await act(async () => {
-      vi.advanceTimersByTime(ms);
-    });
-  }
+    async function avancar(ms: number) {
+      await act(async () => {
+        vi.advanceTimersByTime(ms);
+      });
+    }
 
-  // Preenche "Seu nome" e envia; a promessa da action resolve dentro de act.
-  async function chamarProfissional(nome: string) {
-    fireEvent.change(screen.getByLabelText("Seu nome"), { target: { value: nome } });
-    const enviar = screen.getByText("Chamar um profissional", { selector: "button" });
-    await act(async () => {
-      fireEvent.click(enviar);
-    });
-  }
+    // Preenche "Seu nome" e envia; a promessa da action resolve dentro de act.
+    async function chamarProfissional(nome: string) {
+      fireEvent.change(screen.getByLabelText("Seu nome"), {
+        target: { value: nome },
+      });
+      const enviar = screen.getByText("Chamar um profissional", {
+        selector: "button",
+      });
+      await act(async () => {
+        fireEvent.click(enviar);
+      });
+    }
 
-  function estaNoInicio() {
-    return screen.queryByText("Toque para iniciar", { selector: "button" }) !== null;
-  }
+    function estaNoInicio() {
+      return screen.queryByText("Toque para iniciar", { selector: "button" }) !== null;
+    }
 
-  beforeEach(() => {
-    vi.clearAllMocks();
-    vi.useFakeTimers();
-  });
-
-  afterEach(() => {
-    vi.useRealTimers();
-  });
-
-  it("shows not-found message in an alert with Tentar outro telefone and Voltar ao início", async () => {
-    await buscarCom({ tipo: "nao_encontrado", mensagem: MSG.nao_encontrado });
-
-    expect(screen.getByRole("alert")).toHaveTextContent(MSG.nao_encontrado);
-    expect(botao("Tentar outro telefone")).toBeInTheDocument();
-    expect(botao("Falar com um profissional")).toBeInTheDocument();
-    expect(botao("Voltar ao início")).toBeInTheDocument();
-    expect(screen.queryByText(/paciente_nao_encontrado/)).not.toBeInTheDocument();
-  });
-
-  it("returns to an empty phone screen when patient chooses Tentar outro telefone", async () => {
-    await buscarCom({ tipo: "nao_encontrado", mensagem: MSG.nao_encontrado });
-    screen.getByRole("alert");
-
-    await tocar("Tentar outro telefone");
-
-    screen.getByText(/Informe seu telefone/);
-    expect(campoTelefone().textContent?.trim()).toBe("");
-  });
-
-  it("offers only Voltar ao início when the appointment is outside the check-in window", async () => {
-    await buscarCom({ tipo: "fora_da_janela", mensagem: MSG.fora_da_janela });
-
-    expect(screen.getByRole("alert")).toHaveTextContent(MSG.fora_da_janela);
-    expect(botao("Voltar ao início")).toBeInTheDocument();
-    expect(botao("Tentar outro telefone")).not.toBeInTheDocument();
-    expect(botao("Falar com um profissional")).not.toBeInTheDocument();
-  });
-
-  it("offers the three options when there is no appointment for now, without joining the normal queue", async () => {
-    await buscarCom({ tipo: "sem_agendamento", mensagem: MSG.sem_agendamento });
-
-    expect(screen.getByRole("alert")).toHaveTextContent(MSG.sem_agendamento);
-    expect(botao("Tentar outro telefone")).toBeInTheDocument();
-    expect(botao("Falar com um profissional")).toBeInTheDocument();
-    expect(botao("Voltar ao início")).toBeInTheDocument();
-    expect(botao("Entrar na fila pelo nome")).not.toBeInTheDocument();
-  });
-
-  it("offers Falar com um profissional on the home screen", async () => {
-    render(<KioskCheckinFlow />);
-    await tocar("Toque para iniciar");
-
-    expect(botao("Tenho consulta agendada")).toBeInTheDocument();
-    expect(botao("Falar com um profissional")).toBeInTheDocument();
-  });
-
-  it("calls a professional as urgent without appointment after not-found, without confirming arrival in the CRM", async () => {
-    mocks.registrarEEntrarNaFila.mockResolvedValue({ success: true });
-    await buscarCom({ tipo: "nao_encontrado", mensagem: MSG.nao_encontrado });
-
-    await tocar("Falar com um profissional");
-    await chamarProfissional("João Pereira");
-
-    expect(screen.getByRole("status")).toHaveTextContent(
-      "Tudo certo! Aguarde que logo um profissional chegará."
-    );
-    expect(mocks.registrarEEntrarNaFila).toHaveBeenCalledWith({
-      nome: "João Pereira",
-      tipoChamada: "urgente",
-      semAgendamento: true,
-    });
-    expect(mocks.localizarAgendamentoCheckin).toHaveBeenCalledTimes(1);
-  });
-
-  it("calls a professional from the home screen without querying the CRM", async () => {
-    mocks.registrarEEntrarNaFila.mockResolvedValue({ success: true });
-    render(<KioskCheckinFlow />);
-    await tocar("Toque para iniciar");
-
-    await tocar("Falar com um profissional");
-    await chamarProfissional("João Pereira");
-
-    expect(screen.getByRole("status")).toHaveTextContent(
-      "Tudo certo! Aguarde que logo um profissional chegará."
-    );
-    expect(mocks.registrarEEntrarNaFila).toHaveBeenCalledWith({
-      nome: "João Pereira",
-      tipoChamada: "urgente",
-      semAgendamento: true,
-    });
-    expect(mocks.localizarAgendamentoCheckin).not.toHaveBeenCalled();
-  });
-
-  it("returns to idle 10 s after the professional was called", async () => {
-    mocks.registrarEEntrarNaFila.mockResolvedValue({ success: true });
-    await buscarCom({ tipo: "sem_agendamento", mensagem: MSG.sem_agendamento });
-    await tocar("Falar com um profissional");
-    await chamarProfissional("João Pereira");
-
-    await avancar(9_999);
-    expect(estaNoInicio()).toBe(false);
-
-    await avancar(1);
-    expect(estaNoInicio()).toBe(true);
-  });
-
-  it("rejects a one-character name without calling the queue", async () => {
-    render(<KioskCheckinFlow />);
-    await tocar("Toque para iniciar");
-    await tocar("Falar com um profissional");
-
-    await chamarProfissional("J");
-
-    expect(screen.getByRole("alert")).toHaveTextContent("O nome deve ter pelo menos 2 caracteres.");
-    expect(mocks.registrarEEntrarNaFila).not.toHaveBeenCalled();
-  });
-
-  it("ignores a late queue response after the kiosk went back to the start", async () => {
-    let resolverFila: (valor: { success: boolean }) => void = () => {};
-    mocks.registrarEEntrarNaFila.mockReturnValue(
-      new Promise((resolve) => {
-        resolverFila = resolve;
-      })
-    );
-    await buscarCom({ tipo: "sem_agendamento", mensagem: MSG.sem_agendamento });
-    await tocar("Falar com um profissional");
-    await chamarProfissional("João Pereira");
-    expect(mocks.registrarEEntrarNaFila).toHaveBeenCalledTimes(1);
-
-    await tocar("Voltar ao início");
-    await act(async () => {
-      resolverFila({ success: true });
+    beforeEach(() => {
+      vi.clearAllMocks();
+      vi.useFakeTimers();
     });
 
-    expect(estaNoInicio()).toBe(true);
-    expect(
-      screen.queryByText("Tudo certo! Aguarde que logo um profissional chegará.")
-    ).not.toBeInTheDocument();
-  });
+    afterEach(() => {
+      vi.useRealTimers();
+    });
 
-  it("offers only Voltar ao início on a blocking response", async () => {
-    await buscarCom({ tipo: "impedimento", mensagem: MSG.impedimento });
+    it("shows not-found message in an alert with Tentar outro telefone and Voltar ao início", async () => {
+      await buscarCom({ tipo: "nao_encontrado", mensagem: MSG.nao_encontrado });
 
-    expect(screen.getByRole("alert")).toHaveTextContent(MSG.impedimento);
-    expect(botao("Voltar ao início")).toBeInTheDocument();
-    expect(botao("Tentar outro telefone")).not.toBeInTheDocument();
-    expect(botao("Falar com um profissional")).not.toBeInTheDocument();
-  });
+      expect(screen.getByRole("alert")).toHaveTextContent(MSG.nao_encontrado);
+      expect(botao("Tentar outro telefone")).toBeInTheDocument();
+      expect(botao("Falar com um profissional")).toBeInTheDocument();
+      expect(botao("Voltar ao início")).toBeInTheDocument();
+      expect(screen.queryByText(/paciente_nao_encontrado/)).not.toBeInTheDocument();
+    });
 
-  it("shows the arrival-registered screen without asking for confirmation", async () => {
-    await buscarCom({ tipo: "chegada_ja_registrada", mensagem: MSG.chegada_ja_registrada });
+    it("returns to an empty phone screen when patient chooses Tentar outro telefone", async () => {
+      await buscarCom({ tipo: "nao_encontrado", mensagem: MSG.nao_encontrado });
+      screen.getByRole("alert");
 
-    expect(screen.getByRole("status")).toHaveTextContent(MSG.chegada_ja_registrada);
-    expect(botao("Confirmar chegada")).not.toBeInTheDocument();
-  });
+      await tocar("Tentar outro telefone");
 
-  it("returns to idle exactly 10 s after the arrival-registered screen", async () => {
-    await buscarCom({ tipo: "chegada_ja_registrada", mensagem: MSG.chegada_ja_registrada });
-    screen.getByRole("status");
+      screen.getByText(/Informe seu telefone/);
+      expect(campoTelefone().textContent?.trim()).toBe("");
+    });
 
-    await avancar(9_999);
-    expect(screen.getByRole("status")).toHaveTextContent(MSG.chegada_ja_registrada);
-    expect(estaNoInicio()).toBe(false);
+    it("offers only Voltar ao início when the appointment is outside the check-in window", async () => {
+      await buscarCom({ tipo: "fora_da_janela", mensagem: MSG.fora_da_janela });
 
-    await avancar(1);
-    expect(estaNoInicio()).toBe(true);
-  });
+      expect(screen.getByRole("alert")).toHaveTextContent(MSG.fora_da_janela);
+      expect(botao("Voltar ao início")).toBeInTheDocument();
+      expect(botao("Tentar outro telefone")).not.toBeInTheDocument();
+      expect(botao("Falar com um profissional")).not.toBeInTheDocument();
+    });
 
-  it("returns to idle exactly 20 s after a business error", async () => {
-    await buscarCom({ tipo: "nao_encontrado", mensagem: MSG.nao_encontrado });
-    screen.getByRole("alert");
+    it("offers the three options when there is no appointment for now, without joining the normal queue", async () => {
+      await buscarCom({ tipo: "sem_agendamento", mensagem: MSG.sem_agendamento });
 
-    await avancar(19_999);
-    expect(screen.getByRole("alert")).toHaveTextContent(MSG.nao_encontrado);
-    expect(estaNoInicio()).toBe(false);
+      expect(screen.getByRole("alert")).toHaveTextContent(MSG.sem_agendamento);
+      expect(botao("Tentar outro telefone")).toBeInTheDocument();
+      expect(botao("Falar com um profissional")).toBeInTheDocument();
+      expect(botao("Voltar ao início")).toBeInTheDocument();
+      expect(botao("Entrar na fila pelo nome")).not.toBeInTheDocument();
+    });
 
-    await avancar(1);
-    expect(estaNoInicio()).toBe(true);
-  });
+    it("offers Falar com um profissional on the home screen", async () => {
+      render(<KioskCheckinFlow />);
+      await tocar("Toque para iniciar");
 
-  describe.each([
-    [
-      "do telefone",
-      async () => {
-        render(<KioskCheckinFlow />);
-        await abrirTelefone();
-        digitar("1198");
-      },
-    ],
-    [
-      "de confirmação do agendamento",
-      async () => {
-        mocks.localizarAgendamentoCheckin.mockResolvedValue(MARIA);
-        render(<KioskCheckinFlow />);
-        await abrirTelefone();
-        digitar("11987654321");
-        await buscar();
-        screen.getByText(MENSAGEM_CONFIRMACAO);
-      },
-    ],
-  ])("inactivity on the screen %s", (_tela, prepararTela) => {
-    it("returns to idle at exactly 30 s and discards the phone", async () => {
-      await prepararTela();
+      expect(botao("Tenho consulta agendada")).toBeInTheDocument();
+      expect(botao("Falar com um profissional")).toBeInTheDocument();
+    });
 
-      await avancar(29_999);
+    it("calls a professional as urgent without appointment after not-found, without confirming arrival in the CRM", async () => {
+      mocks.registrarEEntrarNaFila.mockResolvedValue({ success: true });
+      await buscarCom({ tipo: "nao_encontrado", mensagem: MSG.nao_encontrado });
+
+      await tocar("Falar com um profissional");
+      await chamarProfissional("João Pereira");
+
+      expect(screen.getByRole("status")).toHaveTextContent(
+        "Tudo certo! Aguarde que logo um profissional chegará."
+      );
+      expect(mocks.registrarEEntrarNaFila).toHaveBeenCalledWith({
+        nome: "João Pereira",
+        tipoChamada: "urgente",
+        semAgendamento: true,
+      });
+      expect(mocks.localizarAgendamentoCheckin).toHaveBeenCalledTimes(1);
+    });
+
+    it("calls a professional from the home screen without querying the CRM", async () => {
+      mocks.registrarEEntrarNaFila.mockResolvedValue({ success: true });
+      render(<KioskCheckinFlow />);
+      await tocar("Toque para iniciar");
+
+      await tocar("Falar com um profissional");
+      await chamarProfissional("João Pereira");
+
+      expect(screen.getByRole("status")).toHaveTextContent(
+        "Tudo certo! Aguarde que logo um profissional chegará."
+      );
+      expect(mocks.registrarEEntrarNaFila).toHaveBeenCalledWith({
+        nome: "João Pereira",
+        tipoChamada: "urgente",
+        semAgendamento: true,
+      });
+      expect(mocks.localizarAgendamentoCheckin).not.toHaveBeenCalled();
+    });
+
+    it("returns to idle 10 s after the professional was called", async () => {
+      mocks.registrarEEntrarNaFila.mockResolvedValue({ success: true });
+      await buscarCom({ tipo: "sem_agendamento", mensagem: MSG.sem_agendamento });
+      await tocar("Falar com um profissional");
+      await chamarProfissional("João Pereira");
+
+      await avancar(9_999);
       expect(estaNoInicio()).toBe(false);
 
       await avancar(1);
       expect(estaNoInicio()).toBe(true);
+    });
+
+    it("rejects a one-character name without calling the queue", async () => {
+      render(<KioskCheckinFlow />);
+      await tocar("Toque para iniciar");
+      await tocar("Falar com um profissional");
+
+      await chamarProfissional("J");
+
+      expect(screen.getByRole("alert")).toHaveTextContent(
+        "O nome deve ter pelo menos 2 caracteres."
+      );
+      expect(mocks.registrarEEntrarNaFila).not.toHaveBeenCalled();
+    });
+
+    it("ignores a late queue response after the kiosk went back to the start", async () => {
+      let resolverFila: (valor: { success: boolean }) => void = () => {};
+      mocks.registrarEEntrarNaFila.mockReturnValue(
+        new Promise((resolve) => {
+          resolverFila = resolve;
+        })
+      );
+      await buscarCom({ tipo: "sem_agendamento", mensagem: MSG.sem_agendamento });
+      await tocar("Falar com um profissional");
+      await chamarProfissional("João Pereira");
+      expect(mocks.registrarEEntrarNaFila).toHaveBeenCalledTimes(1);
+
+      await tocar("Voltar ao início");
+      await act(async () => {
+        resolverFila({ success: true });
+      });
+
+      expect(estaNoInicio()).toBe(true);
+      expect(
+        screen.queryByText("Tudo certo! Aguarde que logo um profissional chegará.")
+      ).not.toBeInTheDocument();
+    });
+
+    it("offers only Voltar ao início on a blocking response", async () => {
+      await buscarCom({ tipo: "impedimento", mensagem: MSG.impedimento });
+
+      expect(screen.getByRole("alert")).toHaveTextContent(MSG.impedimento);
+      expect(botao("Voltar ao início")).toBeInTheDocument();
+      expect(botao("Tentar outro telefone")).not.toBeInTheDocument();
+      expect(botao("Falar com um profissional")).not.toBeInTheDocument();
+    });
+
+    it("shows the arrival-registered screen without asking for confirmation", async () => {
+      await buscarCom({
+        tipo: "chegada_ja_registrada",
+        mensagem: MSG.chegada_ja_registrada,
+      });
+
+      expect(screen.getByRole("status")).toHaveTextContent(MSG.chegada_ja_registrada);
+      expect(botao("Confirmar chegada")).not.toBeInTheDocument();
+    });
+
+    it("returns to idle exactly 10 s after the arrival-registered screen", async () => {
+      await buscarCom({
+        tipo: "chegada_ja_registrada",
+        mensagem: MSG.chegada_ja_registrada,
+      });
+      screen.getByRole("status");
+
+      await avancar(9_999);
+      expect(screen.getByRole("status")).toHaveTextContent(MSG.chegada_ja_registrada);
+      expect(estaNoInicio()).toBe(false);
+
+      await avancar(1);
+      expect(estaNoInicio()).toBe(true);
+    });
+
+    it("returns to idle exactly 20 s after a business error", async () => {
+      await buscarCom({ tipo: "nao_encontrado", mensagem: MSG.nao_encontrado });
+      screen.getByRole("alert");
+
+      await avancar(19_999);
+      expect(screen.getByRole("alert")).toHaveTextContent(MSG.nao_encontrado);
+      expect(estaNoInicio()).toBe(false);
+
+      await avancar(1);
+      expect(estaNoInicio()).toBe(true);
+    });
+
+    it("returns to idle exactly 15 s after a technical error", async () => {
+      await buscarCom({ tipo: "indisponivel", mensagem: MENSAGEM_INDISPONIVEL });
+      screen.getByRole("alert");
+
+      await avancar(14_999);
+      expect(screen.getByRole("alert")).toHaveTextContent(MENSAGEM_INDISPONIVEL);
+      expect(estaNoInicio()).toBe(false);
+
+      await avancar(1);
+      expect(estaNoInicio()).toBe(true);
+    });
+
+    it("returns to idle exactly 15 s after a technical error when the search call rejects", async () => {
+      mocks.localizarAgendamentoCheckin.mockRejectedValue(new Error("network"));
+      render(<KioskCheckinFlow />);
       await abrirTelefone();
-      expect(campoTelefone().textContent?.trim()).toBe("");
+      digitar("11900000000");
+      await buscar();
+      screen.getByRole("alert");
+
+      await avancar(14_999);
+      expect(screen.getByRole("alert")).toHaveTextContent(MENSAGEM_INDISPONIVEL);
+      expect(estaNoInicio()).toBe(false);
+
+      await avancar(1);
+      expect(estaNoInicio()).toBe(true);
     });
-  });
 
-  it("restarts the 30 s countdown on a touch", async () => {
-    render(<KioskCheckinFlow />);
-    await abrirTelefone();
+    describe.each([
+      [
+        "do telefone",
+        async () => {
+          render(<KioskCheckinFlow />);
+          await abrirTelefone();
+          digitar("1198");
+        },
+      ],
+      [
+        "de confirmação do agendamento",
+        async () => {
+          mocks.localizarAgendamentoCheckin.mockResolvedValue(MARIA);
+          render(<KioskCheckinFlow />);
+          await abrirTelefone();
+          digitar("11987654321");
+          await buscar();
+          screen.getByText(MENSAGEM_CONFIRMACAO);
+        },
+      ],
+    ])("inactivity on the screen %s", (_tela, prepararTela) => {
+      it("returns to idle at exactly 30 s and discards the phone", async () => {
+        await prepararTela();
 
-    await avancar(20_000);
-    fireEvent.click(screen.getByText("1", { selector: "button" }));
-    await avancar(25_000);
+        await avancar(29_999);
+        expect(estaNoInicio()).toBe(false);
 
-    expect(screen.getByText(/Informe seu telefone/)).toBeInTheDocument();
-    expect(estaNoInicio()).toBe(false);
-  });
-
-  it.each([
-    ["nao_encontrado", MSG.nao_encontrado],
-    ["sem_agendamento", MSG.sem_agendamento],
-  ] as const)("never shows the raw reason on screen for %s", async (tipo, mensagem) => {
-    await buscarCom({ tipo, mensagem });
-    screen.getByRole("alert");
-
-    expect(
-      screen.queryByText(/paciente_nao_encontrado|sem_agendamento_agora|dados_invalidos/)
-    ).not.toBeInTheDocument();
-  });
-
-  it("shows the technical message when the queue action rejects", async () => {
-    mocks.registrarEEntrarNaFila.mockRejectedValue(new Error("falha"));
-    render(<KioskCheckinFlow />);
-    await tocar("Toque para iniciar");
-    await tocar("Falar com um profissional");
-
-    await chamarProfissional("João Pereira");
-
-    expect(screen.getByRole("alert")).toHaveTextContent(MENSAGEM_INDISPONIVEL);
-    expect(botao("Voltar ao início")).toBeInTheDocument();
-  });
-
-  it("sends the trimmed name to the queue", async () => {
-    mocks.registrarEEntrarNaFila.mockResolvedValue({ success: true });
-    render(<KioskCheckinFlow />);
-    await tocar("Toque para iniciar");
-    await tocar("Falar com um profissional");
-
-    await chamarProfissional("  João Pereira  ");
-
-    expect(mocks.registrarEEntrarNaFila).toHaveBeenCalledWith({
-      nome: "João Pereira",
-      tipoChamada: "urgente",
-      semAgendamento: true,
+        await avancar(1);
+        expect(estaNoInicio()).toBe(true);
+        await abrirTelefone();
+        expect(campoTelefone().textContent?.trim()).toBe("");
+      });
     });
-  });
 
-  it("offers no Entrar na fila pelo nome on any no-appointment screen", async () => {
-    render(<KioskCheckinFlow />);
-    await tocar("Toque para iniciar");
-    expect(botao("Entrar na fila pelo nome")).not.toBeInTheDocument();
-    await tocar("Falar com um profissional");
-    expect(botao("Entrar na fila pelo nome")).not.toBeInTheDocument();
-    cleanup();
+    it("restarts the 30 s countdown on a touch", async () => {
+      render(<KioskCheckinFlow />);
+      await abrirTelefone();
 
-    await buscarCom({ tipo: "nao_encontrado", mensagem: MSG.nao_encontrado });
-    expect(botao("Entrar na fila pelo nome")).not.toBeInTheDocument();
-  });
+      await avancar(20_000);
+      fireEvent.click(screen.getByText("1", { selector: "button" }));
+      await avancar(25_000);
 
-  it("discards the typed name after 30 s on the call-a-professional screen", async () => {
-    render(<KioskCheckinFlow />);
-    await tocar("Toque para iniciar");
-    await tocar("Falar com um profissional");
-    fireEvent.change(screen.getByLabelText("Seu nome"), { target: { value: "Ana Costa" } });
+      expect(screen.getByText(/Informe seu telefone/)).toBeInTheDocument();
+      expect(estaNoInicio()).toBe(false);
+    });
 
-    await avancar(29_999);
-    expect(estaNoInicio()).toBe(false);
-    await avancar(1);
-    expect(estaNoInicio()).toBe(true);
+    it.each([
+      ["nao_encontrado", MSG.nao_encontrado],
+      ["sem_agendamento", MSG.sem_agendamento],
+    ] as const)("never shows the raw reason on screen for %s", async (tipo, mensagem) => {
+      await buscarCom({ tipo, mensagem });
+      screen.getByRole("alert");
 
-    await tocar("Toque para iniciar");
-    await tocar("Falar com um profissional");
-    expect(screen.getByLabelText("Seu nome")).toHaveValue("");
-  });
+      expect(
+        screen.queryByText(/paciente_nao_encontrado|sem_agendamento_agora|dados_invalidos/)
+      ).not.toBeInTheDocument();
+    });
 
-  it("restarts the 30 s countdown when typing the name", async () => {
-    render(<KioskCheckinFlow />);
-    await tocar("Toque para iniciar");
-    await tocar("Falar com um profissional");
+    it("shows the technical message when the queue action rejects", async () => {
+      mocks.registrarEEntrarNaFila.mockRejectedValue(new Error("falha"));
+      render(<KioskCheckinFlow />);
+      await tocar("Toque para iniciar");
+      await tocar("Falar com um profissional");
 
-    await avancar(20_000);
-    fireEvent.input(screen.getByLabelText("Seu nome"), { target: { value: "Ana" } });
-    await avancar(25_000);
+      await chamarProfissional("João Pereira");
 
-    expect(screen.getByLabelText("Seu nome")).toBeInTheDocument();
-    expect(estaNoInicio()).toBe(false);
-  });
-});
+      expect(screen.getByRole("alert")).toHaveTextContent(MENSAGEM_INDISPONIVEL);
+      expect(botao("Voltar ao início")).toBeInTheDocument();
+    });
+
+    it("sends the trimmed name to the queue", async () => {
+      mocks.registrarEEntrarNaFila.mockResolvedValue({ success: true });
+      render(<KioskCheckinFlow />);
+      await tocar("Toque para iniciar");
+      await tocar("Falar com um profissional");
+
+      await chamarProfissional("  João Pereira  ");
+
+      expect(mocks.registrarEEntrarNaFila).toHaveBeenCalledWith({
+        nome: "João Pereira",
+        tipoChamada: "urgente",
+        semAgendamento: true,
+      });
+    });
+
+    it("offers no Entrar na fila pelo nome on any no-appointment screen", async () => {
+      render(<KioskCheckinFlow />);
+      await tocar("Toque para iniciar");
+      expect(botao("Entrar na fila pelo nome")).not.toBeInTheDocument();
+      await tocar("Falar com um profissional");
+      expect(botao("Entrar na fila pelo nome")).not.toBeInTheDocument();
+      cleanup();
+
+      await buscarCom({ tipo: "nao_encontrado", mensagem: MSG.nao_encontrado });
+      expect(botao("Entrar na fila pelo nome")).not.toBeInTheDocument();
+    });
+
+    it("discards the typed name after 30 s on the call-a-professional screen", async () => {
+      render(<KioskCheckinFlow />);
+      await tocar("Toque para iniciar");
+      await tocar("Falar com um profissional");
+      fireEvent.change(screen.getByLabelText("Seu nome"), {
+        target: { value: "Ana Costa" },
+      });
+
+      await avancar(29_999);
+      expect(estaNoInicio()).toBe(false);
+      await avancar(1);
+      expect(estaNoInicio()).toBe(true);
+
+      await tocar("Toque para iniciar");
+      await tocar("Falar com um profissional");
+      expect(screen.getByLabelText("Seu nome")).toHaveValue("");
+    });
+
+    it("restarts the 30 s countdown when typing the name", async () => {
+      render(<KioskCheckinFlow />);
+      await tocar("Toque para iniciar");
+      await tocar("Falar com um profissional");
+
+      await avancar(20_000);
+      fireEvent.input(screen.getByLabelText("Seu nome"), {
+        target: { value: "Ana" },
+      });
+      await avancar(25_000);
+
+      expect(screen.getByLabelText("Seu nome")).toBeInTheDocument();
+      expect(estaNoInicio()).toBe(false);
+    });
+  }
+);

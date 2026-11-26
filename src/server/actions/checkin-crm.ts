@@ -98,20 +98,23 @@ export async function localizarAgendamentoCheckin(
   if (!limitadorBuscas.permitir(idDispositivo)) return INDISPONIVEL;
 
   const inicio = Date.now();
-  const resultado = await localizarNoCrm(config, validacao.digitos);
+  const { resultado, statusHttp, ok } = await localizarNoCrm(config, validacao.digitos);
   const categoria =
     resultado.tipo === "negocio" ? classificarMotivo(resultado.motivo) : resultado.tipo;
 
   registrarLocalizacao({
     categoria,
+    causa: resultado.tipo === "tecnico" ? resultado.causa : undefined,
     motivo: resultado.tipo === "negocio" ? resultado.motivo : undefined,
     desconhecido: categoria === "desconhecido",
+    statusHttp,
+    ok,
     duracaoMs: Date.now() - inicio,
     correlacao: randomUUID(),
   });
 
   if (resultado.tipo === "negocio") return responderNegocio(resultado.motivo, resultado.mensagem);
-  // Provisório (S1-01): erros técnicos ganham tratamento próprio no S1-03.
+  // Erro técnico: mensagem padrão do totem, nunca a `mensagem` do corpo (RF-001.11).
   if (resultado.tipo !== "encontrado") return INDISPONIVEL;
 
   const { primeiroNome, hora, profissional } = resultado.agendamento;

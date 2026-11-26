@@ -7,9 +7,9 @@ vi.mock("next/headers", () => ({ cookies: vi.fn() }));
 
 import { cookies } from "next/headers";
 import {
+  gerarAutorizacao,
   NOME_COOKIE_ACESSO,
   VALIDADE_ACESSO_SEGUNDOS,
-  gerarAutorizacao,
   validarAutorizacao,
 } from "@/lib/crm/acesso";
 import { limitadorBuscas } from "@/lib/crm/limitador";
@@ -51,7 +51,10 @@ beforeEach(() => {
   configurarAmbienteLigado();
   cookieGet.mockReset();
   cookieSet.mockReset();
-  vi.mocked(cookies).mockResolvedValue({ get: cookieGet, set: cookieSet } as never);
+  vi.mocked(cookies).mockResolvedValue({
+    get: cookieGet,
+    set: cookieSet,
+  } as never);
   definirCookieAcesso(gerarAutorizacao(CHAVE_ACESSO, "dispositivo-1"));
   limitadorBuscas.reiniciar();
 });
@@ -59,6 +62,7 @@ beforeEach(() => {
 afterEach(() => {
   vi.unstubAllEnvs();
   vi.unstubAllGlobals();
+  vi.restoreAllMocks();
 });
 
 describe("localizarAgendamentoCheckin", () => {
@@ -129,7 +133,9 @@ describe("localizarAgendamentoCheckin", () => {
         tipo: "telefone_invalido",
         mensagem: MENSAGEM_TELEFONE_INVALIDO,
       });
-      expect(resultado).toMatchObject({ mensagem: "Digite o telefone com DDD." });
+      expect(resultado).toMatchObject({
+        mensagem: "Digite o telefone com DDD.",
+      });
       expect(fetchMock).not.toHaveBeenCalled();
     });
   });
@@ -228,7 +234,10 @@ describe("localizarAgendamentoCheckin", () => {
 
       const resultado = await localizarAgendamentoCheckin("11987654321");
 
-      expect(resultado).toEqual({ tipo: "indisponivel", mensagem: MENSAGEM_ERRO_TECNICO });
+      expect(resultado).toEqual({
+        tipo: "indisponivel",
+        mensagem: MENSAGEM_ERRO_TECNICO,
+      });
       expect(fetchMock).not.toHaveBeenCalled();
     });
   });
@@ -243,7 +252,10 @@ describe("localizarAgendamentoCheckin", () => {
       }
       const resultado = await localizarAgendamentoCheckin("11987654321");
 
-      expect(resultado).toEqual({ tipo: "indisponivel", mensagem: MENSAGEM_ERRO_TECNICO });
+      expect(resultado).toEqual({
+        tipo: "indisponivel",
+        mensagem: MENSAGEM_ERRO_TECNICO,
+      });
       expect(fetchMock).toHaveBeenCalledTimes(10);
     });
 
@@ -402,7 +414,10 @@ describe("localizarAgendamentoCheckin - respostas de negócio do CRM", () => {
 
       const resultado = await localizarAgendamentoCheckin("11977778888");
 
-      expect(resultado).toEqual({ tipo: "sem_agendamento", mensagem: "Sem horário agora." });
+      expect(resultado).toEqual({
+        tipo: "sem_agendamento",
+        mensagem: "Sem horário agora.",
+      });
     });
   });
 
@@ -445,8 +460,6 @@ describe("localizarAgendamentoCheckin - respostas de negócio do CRM", () => {
 
       const linhasWarn = linhasLogLocalizar([warn]);
       const todas = [...info.mock.calls, ...warn.mock.calls].map((a) => JSON.stringify(a));
-      info.mockRestore();
-      warn.mockRestore();
       expect(linhasWarn).toHaveLength(1);
       expect(linhasWarn[0]).toMatchObject({
         evento: "crm.localizar",
@@ -470,8 +483,6 @@ describe("localizarAgendamentoCheckin - respostas de negócio do CRM", () => {
       const linhasInfo = linhasLogLocalizar([info]);
       const todas = [...info.mock.calls, ...warn.mock.calls].map((a) => JSON.stringify(a));
       const avisos = warn.mock.calls.length;
-      info.mockRestore();
-      warn.mockRestore();
       expect(linhasInfo).toHaveLength(1);
       expect(linhasInfo[0]).toMatchObject({
         evento: "crm.localizar",
@@ -532,8 +543,13 @@ describe("ativarTotemCheckin", () => {
     ])("returns invalid-key message and sets no cookie for %s", async (_rotulo, entrada) => {
       const resultado = await ativarTotemCheckin(entrada as unknown as string);
 
-      expect(resultado).toEqual({ ok: false, mensagem: MENSAGEM_CHAVE_INVALIDA });
-      expect(resultado).toMatchObject({ mensagem: "Chave de acesso inválida." });
+      expect(resultado).toEqual({
+        ok: false,
+        mensagem: MENSAGEM_CHAVE_INVALIDA,
+      });
+      expect(resultado).toMatchObject({
+        mensagem: "Chave de acesso inválida.",
+      });
       expect(cookieSet).not.toHaveBeenCalled();
     });
   });
@@ -552,7 +568,10 @@ describe("ativarTotemCheckin", () => {
 
       const resultado = await ativarTotemCheckin(CHAVE_ACESSO);
 
-      expect(resultado).toEqual({ ok: false, mensagem: MENSAGEM_ERRO_TECNICO });
+      expect(resultado).toEqual({
+        ok: false,
+        mensagem: MENSAGEM_ERRO_TECNICO,
+      });
       expect(cookieSet).not.toHaveBeenCalled();
     });
 
@@ -600,7 +619,6 @@ describe("ativarTotemCheckin - bordas e ciclo completo", () => {
     await localizarAgendamentoCheckin("11987654321");
 
     const registrado = espioes.flatMap((e) => e.mock.calls).map((args) => JSON.stringify(args));
-    espioes.forEach((e) => e.mockRestore());
     expect(registrado.filter((linha) => linha.includes(CHAVE_ACESSO))).toEqual([]);
   });
 });
@@ -639,14 +657,13 @@ describe("localizarAgendamentoCheckin - lacunas da auditoria", () => {
     await localizarAgendamentoCheckin("11977778888");
 
     const linhas = linhasLogLocalizar([info]);
-    info.mockRestore();
     expect(linhas).toHaveLength(1);
     expect(linhas[0].categoria).toBe("sem_agendamento");
     expect(typeof linhas[0].correlacao).toBe("string");
     expect(linhas[0].correlacao.length).toBeGreaterThan(0);
   });
 
-  it("logs categoria tecnico without motivo on a technical error (HTTP 401)", async () => {
+  it("logs categoria tecnico via console.warn with statusHttp 401 on a technical error (HTTP 401)", async () => {
     const info = vi.spyOn(console, "info").mockImplementation(() => {});
     const warn = vi.spyOn(console, "warn").mockImplementation(() => {});
     fetchMock.mockResolvedValue(respostaHttp(respostaTokenInvalido));
@@ -654,11 +671,152 @@ describe("localizarAgendamentoCheckin - lacunas da auditoria", () => {
     await localizarAgendamentoCheckin("11987654321");
 
     const linhas = linhasLogLocalizar([info, warn]);
-    info.mockRestore();
-    warn.mockRestore();
+    const linhasWarn = linhasLogLocalizar([warn]);
     expect(linhas).toHaveLength(1);
+    expect(linhasWarn).toHaveLength(1);
     expect(linhas[0].categoria).toBe("tecnico");
-    expect(linhas[0].motivo).toBeUndefined();
+    expect(linhas[0].statusHttp).toBe(401);
     expect(linhas[0].desconhecido).toBe(false);
+  });
+});
+
+describe("localizarAgendamentoCheckin - erros técnicos na localização", () => {
+  const SEM_DADOS_PESSOAIS = ["Maria", "14:00", "Ana Lima"];
+
+  describe("Cenário: CRM recusa a chave de acesso", () => {
+    it("returns indisponivel without the CRM's 'Só um instante' text on HTTP 401", async () => {
+      fetchMock.mockResolvedValue(respostaHttp(respostaTokenInvalido));
+
+      const resultado = await localizarAgendamentoCheckin("11987654321");
+
+      expect(resultado).toEqual({
+        tipo: "indisponivel",
+        mensagem: MENSAGEM_ERRO_TECNICO,
+      });
+      expect(JSON.stringify(resultado)).not.toContain("Só um instante");
+    });
+  });
+
+  describe("Esquema do Cenário: Outras falhas técnicas", () => {
+    const sucessoCom = (alterar: (c: Record<string, unknown>) => void) => {
+      const corpo: Record<string, unknown> = { ...respostaSucesso.corpo };
+      alterar(corpo);
+      return respostaHttp({ status: 200, corpo });
+    };
+
+    it.each([
+      ["HTTP 500", () => respostaHttp({ status: 500, corpo: { ok: false } }), undefined],
+      ["HTTP 503", () => respostaHttp({ status: 503, corpo: { ok: false } }), undefined],
+      [
+        "tempo esgotado",
+        () => {
+          throw new Error("não usado");
+        },
+        "timeout",
+      ],
+      ["erro de rede", () => Promise.reject(new TypeError("fetch failed")), "rede"],
+      ["200 com corpo não JSON", () => new Response("x", { status: 200 }), undefined],
+      [
+        "200 sem ok",
+        () =>
+          respostaHttp({
+            status: 200,
+            corpo: { motivo: "x", primeiro_nome: "Maria" },
+          }),
+        undefined,
+      ],
+      [
+        "sucesso sem profissional",
+        () =>
+          sucessoCom((c) => {
+            delete c.profissional;
+          }),
+        undefined,
+      ],
+      [
+        "sucesso sem consulta_id",
+        () =>
+          sucessoCom((c) => {
+            delete c.consulta_id;
+          }),
+        undefined,
+      ],
+    ])("returns indisponivel without personal data on %s", async (_rotulo, resposta, modo) => {
+      if (modo === "timeout") {
+        vi.stubEnv("CRM_TIMEOUT_MS", "50");
+        fetchMock.mockImplementation(
+          (_url: unknown, init: { signal: AbortSignal }) =>
+            new Promise((_resolve, reject) => {
+              init.signal.addEventListener("abort", () => reject(init.signal.reason));
+            })
+        );
+      } else {
+        fetchMock.mockImplementation(async () => resposta());
+      }
+      vi.spyOn(console, "warn").mockImplementation(() => {});
+
+      const resultado = await localizarAgendamentoCheckin("11987654321");
+
+      expect(resultado).toEqual({
+        tipo: "indisponivel",
+        mensagem: MENSAGEM_ERRO_TECNICO,
+      });
+      const serializado = JSON.stringify(resultado);
+      for (const dado of SEM_DADOS_PESSOAIS) expect(serializado).not.toContain(dado);
+    });
+  });
+
+  describe("Cenário: Registro técnico sem dados pessoais", () => {
+    it("logs one crm.localizar line in console.warn with statusHttp, causa and correlacao on HTTP 500", async () => {
+      const info = vi.spyOn(console, "info").mockImplementation(() => {});
+      const warn = vi.spyOn(console, "warn").mockImplementation(() => {});
+      const log = vi.spyOn(console, "log").mockImplementation(() => {});
+      const error = vi.spyOn(console, "error").mockImplementation(() => {});
+      fetchMock.mockResolvedValue(respostaHttp({ status: 500, corpo: { ok: false } }));
+
+      await localizarAgendamentoCheckin("11987654321");
+
+      const linhasWarn = linhasLogLocalizar([warn]);
+      const todas = [info, warn, log, error]
+        .flatMap((e) => e.mock.calls)
+        .map((a) => JSON.stringify(a));
+      expect(linhasWarn).toHaveLength(1);
+      expect(linhasWarn[0]).toMatchObject({
+        evento: "crm.localizar",
+        operacao: "localizar",
+        categoria: "tecnico",
+        causa: "status_http",
+        statusHttp: 500,
+        ok: false,
+      });
+      expect(typeof linhasWarn[0].duracaoMs).toBe("number");
+      expect(linhasWarn[0].duracaoMs).toBeGreaterThanOrEqual(0);
+      expect(typeof linhasWarn[0].correlacao).toBe("string");
+      expect(linhasWarn[0].correlacao.length).toBeGreaterThan(0);
+      expect(todas.filter((l) => l.includes("11987654321"))).toEqual([]);
+      expect(todas.filter((l) => l.includes(CHAVE))).toEqual([]);
+    });
+
+    it("logs causa tempo_esgotado with statusHttp null when the CRM does not answer in time", async () => {
+      vi.stubEnv("CRM_TIMEOUT_MS", "50");
+      const warn = vi.spyOn(console, "warn").mockImplementation(() => {});
+      fetchMock.mockImplementation(
+        (_url: unknown, init: { signal: AbortSignal }) =>
+          new Promise((_resolve, reject) => {
+            init.signal.addEventListener("abort", () => reject(init.signal.reason));
+          })
+      );
+
+      await localizarAgendamentoCheckin("11987654321");
+
+      const linhas = linhasLogLocalizar([warn]);
+      expect(linhas).toHaveLength(1);
+      expect(linhas[0]).toMatchObject({
+        operacao: "localizar",
+        categoria: "tecnico",
+        causa: "tempo_esgotado",
+        statusHttp: null,
+      });
+    });
   });
 });

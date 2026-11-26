@@ -1,4 +1,4 @@
-import { beforeEach, describe, expect, it, vi } from "vitest";
+import { afterEach, beforeEach, describe, expect, it, vi } from "vitest";
 
 const { atendimentoCreate, userFindMany, notificacaoCreateMany } = vi.hoisted(() => ({
   atendimentoCreate: vi.fn(),
@@ -25,6 +25,11 @@ function notificacoes(titulo: string, mensagem: string, tipo: "URGENTE" | "NORMA
 }
 
 describe("registrarEEntrarNaFila", () => {
+  afterEach(() => {
+    vi.unstubAllGlobals();
+    vi.restoreAllMocks();
+  });
+
   beforeEach(() => {
     vi.clearAllMocks();
     vi.spyOn(console, "error").mockImplementation(() => {});
@@ -51,6 +56,20 @@ describe("registrarEEntrarNaFila", () => {
       expect(notificacaoCreateMany).toHaveBeenCalledWith(
         notificacoes("Novo paciente na fila", "Novo Paciente: Ana", "NORMAL")
       );
+    });
+  });
+
+  describe("Totem atual continua funcionando com o CRM fora do ar", () => {
+    it("cria o atendimento sem chamar o CRM quando o fetch falha", async () => {
+      const fetchMock = vi.fn().mockRejectedValue(new TypeError("fetch failed"));
+      vi.stubGlobal("fetch", fetchMock);
+
+      await registrarEEntrarNaFila({ nome: "Carlos Lima", tipoChamada: "normal" });
+
+      expect(atendimentoCreate).toHaveBeenCalledWith({
+        data: expect.objectContaining({ nomePaciente: "Carlos Lima", tipoChamada: "normal" }),
+      });
+      expect(fetchMock).not.toHaveBeenCalled();
     });
   });
 
