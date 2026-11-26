@@ -1,0 +1,52 @@
+{
+  "$comment": "Configuração do padrão Nós para este repositório. Lida pelos hooks, agentes e pelo RAG.",
+  "projeto": "re-attendant-bot",
+  "perfis": ["nextjs-supabase"],
+  "idioma": {
+    "conversa": "pt-BR",
+    "codigo": "pt-BR",
+    "docs": "pt-BR"
+  },
+  "comandos": {
+    "format": "pnpm format",
+    "lint": "pnpm lint",
+    "typecheck": "pnpm type-check",
+    "test": "pnpm test run"
+  },
+  "pr": {
+    "maxArquivos": 20,
+    "baseBranch": "main",
+    "naoContam": [
+      "bun.lock",
+      "package-lock.json",
+      "pnpm-lock.yaml",
+      "*.lock",
+      "**/database.types.ts",
+      ".changeset/**",
+      "README.md",
+      "CLAUDE.md",
+      "docs/context/INDEX.md",
+      ".claude/**",
+      ".nos-ai.json"
+    ]
+  },
+  "rag": {
+    "namespace": "re-attendant-bot",
+    "visibilidade": "private",
+    "lerTambem": [],
+    "incluir": ["docs/**", "src/**", "prisma/**", "*.md"],
+    "ignorar": [
+      "**/node_modules/**",
+      "**/.next/**",
+      "**/dist/**",
+      "**/bin/**",
+      "**/obj/**",
+      "**/coverage/**",
+      "**/*.snap",
+      "**/*.min.*"
+    ]
+  },
+  "segredos": {
+    "permitidos": [".env.example"]
+  }
+}
