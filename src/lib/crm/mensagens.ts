@@ -8,6 +8,8 @@ export const MENSAGEM_TELEFONE_INVALIDO = "Digite o telefone com DDD.";
 export const MENSAGEM_ERRO_TECNICO =
   "Não foi possível concluir seu check-in agora. Por favor, procure a recepção.";
 
+export const MENSAGEM_CHAVE_INVALIDA = "Chave de acesso inválida.";
+
 export const FALA_PEDIR_TELEFONE = "Digite seu telefone com DDD e toque em buscar.";
 
 export const FALA_BOAS_VINDAS =

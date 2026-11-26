@@ -9,7 +9,12 @@ import { z } from "zod";
  * - CRM_BASE_URL: endereço das funções do CRM (ex.: https://<ref>.supabase.co/functions/v1)
  * - CRM_API_KEY: chave enviada no header x-api-key (segredo; nunca NEXT_PUBLIC_)
  * - CRM_TIMEOUT_MS: tempo limite por chamada, padrão 8000 (RNF-001.7)
+ * - CRM_CHECKIN_ACCESS_KEY: chave de ativação dos tablets, no mínimo 32 caracteres (RNF-001.4)
  */
+
+// Com 32+ caracteres aleatórios, adivinhar a chave por tentativa é inviável,
+// o que dispensa um limite de tentativas na tela de ativação.
+const TAMANHO_MINIMO_CHAVE_ACESSO = 32;
 
 const TEMPO_LIMITE_PADRAO_MS = 8000;
 
@@ -27,6 +32,11 @@ export type ConfigCrm = {
 
 export function checkinCrmHabilitado(): boolean {
   return process.env.CRM_CHECKIN_ENABLED === "true";
+}
+
+export function obterChaveAcesso(): string | null {
+  const chave = process.env.CRM_CHECKIN_ACCESS_KEY ?? "";
+  return chave.length >= TAMANHO_MINIMO_CHAVE_ACESSO ? chave : null;
 }
 
 export function obterConfigCrm(): ConfigCrm | null {
