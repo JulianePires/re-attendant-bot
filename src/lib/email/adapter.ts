@@ -25,19 +25,38 @@ export const betterAuthEmailAdapter = {
    * @param data - Dados da solicitação
    * @param data.url - URL completa para redefinição (incluindo token)
    * @param data.token - Token de redefinição
+   * @param data.name - Nome do destinatário, usado na saudação (opcional)
    */
   sendPasswordResetEmail: async (
     email: string,
     data: {
       url: string;
       token: string;
+      name?: string | null;
     }
   ) => {
     try {
-      await sendPasswordResetEmail(email, data.url);
+      await sendPasswordResetEmail(email, data.url, data.name ?? undefined);
     } catch (error) {
       const errorMessage = error instanceof Error ? error.message : "Erro desconhecido";
       console.error("[BetterAuth] Erro ao enviar email de redefinição:", errorMessage);
+      throw error;
+    }
+  },
+
+  /**
+   * Envia email de confirmação de senha alterada
+   * Chamado após uma redefinição de senha bem-sucedida
+   *
+   * @param email - Email do destinatário
+   * @param name - Nome do destinatário, usado na saudação (opcional)
+   */
+  sendPasswordChangedEmail: async (email: string, name?: string | null) => {
+    try {
+      await sendPasswordChangedEmail(email, name ?? undefined);
+    } catch (error) {
+      const errorMessage = error instanceof Error ? error.message : "Erro desconhecido";
+      console.error("[BetterAuth] Erro ao enviar email de senha alterada:", errorMessage);
       throw error;
     }
   },

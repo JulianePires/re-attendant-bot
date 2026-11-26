@@ -5,11 +5,7 @@ import { prisma } from "@/lib/prisma";
 import { nextCookies } from "better-auth/next-js";
 import { sendEmail, sendPasswordResetEmail } from "@/lib/email/service";
 import { emailConfig } from "@/lib/email/config";
-import {
-  betterAuthEmailAdapter,
-  PasswordChangedEmailTemplate,
-  PasswordResetEmailTemplate,
-} from "./email";
+import { betterAuthEmailAdapter } from "./email";
 
 // ================================================================
 // INICIALIZAÇÃO DO BETTERAUTH
@@ -44,15 +40,12 @@ export const auth = betterAuth({
       await betterAuthEmailAdapter.sendPasswordResetEmail(user.email, {
         url,
         token,
+        name: user.name,
       });
     },
     onPasswordReset: async ({ user }, request) => {
       try {
-        await betterAuthEmailAdapter.sendCustomEmail(
-          user.email,
-          "Senha Alterada com Sucesso",
-          PasswordChangedEmailTemplate(user.name || "Usuário")
-        );
+        await betterAuthEmailAdapter.sendPasswordChangedEmail(user.email, user.name);
       } catch (error) {
         console.error("[Auth] Erro ao enviar email de confirmação de senha alterada:", error);
       }
