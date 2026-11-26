@@ -25,26 +25,31 @@ Sistema clínico fullstack que combina um **totem de autoatendimento** (tablet p
 
 ## Visão Geral
 
-O sistema é dividido em duas interfaces complementares:
+O sistema é dividido em interfaces complementares:
 
-| Interface  | Público       | URL       | Descrição                                 |
-| ---------- | ------------- | --------- | ----------------------------------------- |
-| **Totem**  | Pacientes     | `/`       | Kiosk touchscreen para entrada na fila    |
-| **Painel** | Profissionais | `/painel` | Dashboard de gestão da fila em tempo real |
+| Interface   | Público        | URL         | Descrição                                                        |
+| ----------- | -------------- | ----------- | ---------------------------------------------------------------- |
+| **Totem**   | Pacientes      | `/recepcao` | Kiosk touchscreen para entrada na fila (`/` redireciona para cá) |
+| **TV**      | Sala de espera | `/tv`       | Fila pública em tempo real com alerta sonoro                     |
+| **Monitor** | Sala de espera | `/monitor`  | Fila pública com tempo de espera e campainha                     |
+| **Painel**  | Profissionais  | `/adm`      | Gestão da fila, histórico, equipe e usuários                     |
 
 ### Fluxo principal
 
 ```
-Paciente toca no totem
+Paciente informa o nome no totem (/recepcao)
     │
-    ├─ "Entrar na Fila"  → cria Atendimento (tipoChamada: normal)
+    ├─ "Entrar na Fila"      → cria Atendimento (tipoChamada: normal)
     └─ "Preciso de Urgência" → cria Atendimento (tipoChamada: urgente)
+              │   (em ambos os casos: + Notificacao para cada profissional/admin)
+              ▼
+    Fila atualizada em tempo real (Supabase Realtime) no painel, TV e monitor
               │
               ▼
-    Profissional vê a fila no painel (atualização via Supabase Realtime)
+    Profissional finaliza → Atendimento.status = finalizado
               │
               ▼
-    Profissional clica "Chamar" → Atendimento → status: finalizado
+    Fim do turno → finalizados do turno são arquivados (arquivadoTurno = true)
 ```
 
 ---
@@ -77,62 +82,48 @@ Paciente toca no totem
 ```
 /
 ├── prisma/
-│   └── schema.prisma            # Schema do banco (User, Session, Account, Verification, Atendimento)
-├── public/
+│   ├── schema.prisma            # User, Session, Account, Verification, Notificacao, Atendimento
+│   ├── migrations/
+│   └── seed.ts                  # Cria usuário admin padrão (banco vazio)
+├── public/                      # Assets (inclui sons de notificação)
 ├── src/
+│   ├── proxy.ts                 # Proteção de rotas (substitui o middleware.ts no Next 16)
 │   ├── app/
-│   │   ├── layout.tsx           # Layout raiz (Inter, ThemeProvider, QueryProvider)
-│   │   ├── page.tsx             # Totem — tela de standby (rota /)
-│   │   ├── globals.css          # Tokens Shadcn + variáveis Tailwind v4
-│   │   ├── api/
-│   │   │   └── auth/[...all]/
-│   │   │       └── route.ts     # Handler HTTP do BetterAuth (GET + POST)
-│   │   ├── (tablet)/
-│   │   │   └── layout.tsx       # Layout kiosk para sub-rotas do totem
-│   │   └── (painel)/
-│   │       ├── layout.tsx       # Layout administrativo (Sidebar + Header)
-│   │       └── painel/
-│   │           └── page.tsx     # Dashboard com fila e histórico
+│   │   ├── layout.tsx           # Layout raiz (fontes, ThemeProvider, QueryProvider, Analytics)
+│   │   ├── page.tsx             # / → redireciona para /recepcao
+│   │   ├── forbidden.tsx        # Página 403 (authInterrupts)
+│   │   ├── recepcao/            # Totem do paciente
+│   │   ├── tv/                  # Tela pública da TV
+│   │   ├── monitor/             # Monitor público da fila
+│   │   ├── adm/                 # Painel (layout com PainelHeader + BottomNav)
+│   │   │   ├── login/
+│   │   │   ├── historico/
+│   │   │   ├── equipe/          # Apenas admin
+│   │   │   └── usuarios/        # Apenas admin (inclui /novo)
+│   │   ├── (auth)/              # /esqueci-a-senha, /redefinir-senha
+│   │   └── api/auth/[...all]/   # Handler HTTP do BetterAuth
 │   ├── components/
-│   │   ├── tablet/
-│   │   │   ├── BotAvatar.tsx    # Avatar animado do assistente virtual
-│   │   │   └── BotAvatar.test.tsx
-│   │   ├── painel/
-│   │   │   ├── Sidebar.tsx      # Navegação lateral (Dashboard, Histórico, Usuários)
-│   │   │   ├── Header.tsx       # Header com sessão do usuário (Server Component)
-│   │   │   └── SignOutButton.tsx # Botão de logout (Client Component)
-│   │   ├── providers/
-│   │   │   ├── query-provider.tsx  # TanStack Query (QueryClient por sessão)
-│   │   │   └── theme-provider.tsx  # next-themes (dark/light/system)
-│   │   └── ui/
-│   │       └── button.tsx       # Componentes base Shadcn (gerados via CLI)
-│   ├── hooks/
-│   │   └── useTTS.ts            # Text-to-Speech nativo (Web Speech API, pt-BR)
+│   │   ├── common/              # atoms/molecules compartilhados
+│   │   ├── dashboard/           # atoms/molecules/organisms do painel
+│   │   ├── painel/              # Shell do painel (header, navegação, notificações, diálogos)
+│   │   ├── tablet/              # Totem (rosto do robô, fluxo de interação, formulário)
+│   │   ├── providers/           # Query, tema, overlay de carregamento
+│   │   └── ui/                  # Componentes Shadcn (gerados via CLI)
+│   ├── hooks/                   # Realtime da fila, notificações, sons, TTS
 │   ├── lib/
 │   │   ├── auth.ts              # BetterAuth server — APENAS server-side
-│   │   ├── auth-client.ts       # BetterAuth client — hooks para componentes
-│   │   ├── prisma.ts            # Singleton do Prisma Client (hot-reload safe)
-│   │   ├── supabase-client.ts   # Cliente Supabase (foco em Realtime)
-│   │   ├── query-client.ts      # Factory criarQueryClient() com config WebSocket
-│   │   └── utils.ts             # cn() = clsx + tailwind-merge
-│   ├── server/
-│   │   └── actions/             # Server Actions isoladas (a implementar)
-│   ├── test/
-│   │   └── setup.ts             # @testing-library/jest-dom/vitest
-│   └── types/
-│       └── index.ts             # Enums, schemas Zod e tipos inferidos
-├── .env.example
-├── .husky/
-│   ├── pre-commit               # lint-staged
-│   └── commit-msg               # commitlint
-├── .prettierrc
-├── commitlint.config.mjs
+│   │   ├── auth-client.ts       # BetterAuth client
+│   │   ├── prisma.ts            # Singleton do Prisma Client
+│   │   ├── supabase-client.ts   # Cliente Supabase (apenas Realtime)
+│   │   ├── constants.ts         # APP_ROUTES
+│   │   ├── email/               # Envio de e-mails (SMTP) e templates
+│   │   ├── utils/turnos.ts      # Cálculo do turno atual
+│   │   └── validations/
+│   ├── server/actions/          # Server Actions (atendimento, histórico, notificações, usuários, senha)
+│   ├── test/setup.ts
+│   └── types/index.ts           # Constantes, schemas Zod e tipos inferidos
 ├── docker-compose.yml           # PostgreSQL local via Podman/Docker
-├── eslint.config.mjs
-├── next.config.ts               # React Compiler
-├── postcss.config.mjs
-├── tsconfig.json
-└── vitest.config.ts
+└── next.config.ts               # React Compiler + authInterrupts
 ```
 
 ---
@@ -213,53 +204,68 @@ NEXT_PUBLIC_APP_URL="http://localhost:3000"   # URL pública (browser)
 ### Modelagem
 
 ```
-┌─────────────────────────────────────────┐
-│                  User                   │  ← Gerenciado pelo BetterAuth
-├─────────────────────────────────────────┤
-│ id            String  @id               │
-│ name          String                    │
-│ email         String  @unique           │
-│ emailVerified Boolean                   │
-│ image         String?                   │
-│ createdAt     DateTime                  │
-│ updatedAt     DateTime                  │
-│ ─────── RBAC (plugin Admin) ──────────  │
-│ role          String?  default:"paciente"│
-│ banned        Boolean?                  │
-│ banReason     String?                   │
-│ banExpires    DateTime?                 │
-│ ─────── Campos da Clínica ────────────  │
-│ cpf           String  @unique           │  ← Não exposto na sessão cliente
-│ ultimoAcesso  DateTime?                 │
-└──────────────┬──────────────────────────┘
-               │ 1:N
-               ▼
-┌─────────────────────────────────────────┐
-│               Atendimento               │  ← Tabela de negócio
-├─────────────────────────────────────────┤
-│ id           String   @id @default(cuid)│
-│ pacienteId   String   (FK → User.id)    │
-│ tipoChamada  String   default:"normal"  │  "normal" | "urgente"
-│ status       String   default:"aguardando"│ "aguardando" | "finalizado"
-│ criadoEm    DateTime  @default(now())   │
-│ finalizadoEm DateTime?                  │
-│ ─────── Índice ────────────────────────  │
-│ @@index([status, criadoEm])             │  ← Otimiza queries de fila
-└─────────────────────────────────────────┘
+┌────────────────────────────────────────────────┐
+│                      User                      │  ← BetterAuth (apenas profissionais/admin)
+├────────────────────────────────────────────────┤
+│ id            String    @id                    │
+│ name          String                           │
+│ email         String?   @unique                │
+│ emailVerified Boolean                          │
+│ image         String?                          │
+│ createdAt     DateTime                         │
+│ updatedAt     DateTime                         │
+│ ─────── RBAC (plugin Admin) ─────────────────  │
+│ role          String?   default:"profissional" │  "admin" | "profissional"
+│ banned        Boolean?                         │
+│ banReason     String?                          │
+│ banExpires    DateTime?                        │
+│ ─────── Campos da Clínica ───────────────────  │
+│ cpf           String?   @unique                │  ← Não exposto na sessão cliente
+│ ultimoAcesso  DateTime?                        │
+└───────────────────────┬────────────────────────┘
+                        │ 1:N
+                        ▼
+┌────────────────────────────────────────────────┐
+│                  Notificacao                   │
+├────────────────────────────────────────────────┤
+│ id         String          @id @default(cuid)  │
+│ titulo     String                              │
+│ mensagem   String                              │
+│ tipo       TipoNotificacao default:NORMAL      │  URGENTE | NORMAL
+│ lida       Boolean         default:false       │
+│ criadoEm   DateTime        @default(now())     │
+│ usuarioId  String          (FK → User.id)      │  onDelete: Cascade
+└────────────────────────────────────────────────┘
+
+┌────────────────────────────────────────────────┐
+│                  Atendimento                   │  ← Sem relação com User
+├────────────────────────────────────────────────┤
+│ id             String    @id @default(cuid)    │
+│ nomePaciente   String                          │  ← Nome digitado no totem
+│ tipoChamada    String    default:"normal"      │  "normal" | "urgente"
+│ status         String    default:"aguardando"  │  "aguardando" | "finalizado"
+│ criadoEm       DateTime  @default(now())       │
+│ finalizadoEm   DateTime?                       │
+│ arquivadoTurno Boolean   default:false         │
+│ ─────── Índice ──────────────────────────────  │
+│ @@index([status, criadoEm])                    │  ← Otimiza queries de fila
+└────────────────────────────────────────────────┘
 
 ┌──────────────────┐  ┌──────────────────┐  ┌──────────────────┐
 │     Session      │  │     Account      │  │   Verification   │
-│ (BetterAuth)     │  │ (BetterAuth)     │  │  (BetterAuth)    │
+│   (BetterAuth)   │  │   (BetterAuth)   │  │   (BetterAuth)   │
 └──────────────────┘  └──────────────────┘  └──────────────────┘
 ```
+
+No banco, as tabelas têm nomes minúsculos (`user`, `atendimento`, `notificacao`, …) via `@@map`.
 
 ### Máquina de estados do Atendimento
 
 ```
-                  ┌──────────────┐
-   [Paciente toca]│   aguardando │──[Profissional chama]──► finalizado
-                  └──────────────┘
+[Paciente no totem] → aguardando ──[Profissional finaliza]──► finalizado ──[Fim do turno]──► arquivadoTurno = true
 ```
+
+Turnos (`src/lib/utils/turnos.ts`): manhã (06:00–11:59), tarde (12:00–17:59) e noite. A fila ativa e os atendimentos do dia consideram apenas o turno atual; arquivar o turno marca os finalizados com `arquivadoTurno = true`, sem apagá-los.
 
 ### Comandos do banco
 
@@ -275,49 +281,37 @@ pnpm db:reset             # Descarta todas as migrations e recria o banco
 
 ## Rotas da Aplicação
 
-### Arquitetura de Route Groups
-
-```
-src/app/
-│
-├── page.tsx                  →  /
-│   Layout: root (ThemeProvider + QueryProvider)
-│   Componente: TabletStandbyPage
-│
-├── (tablet)/
-│   layout.tsx                → Kiosk Mode: gradiente sky→indigo,
-│   │                           overflow-hidden, select-none
-│   └── [sub-rotas futuras]   →  /fila, /sucesso, /aguardando
-│
-├── (painel)/
-│   layout.tsx                → Sidebar + Header (auth server-side)
-│   └── painel/
-│       page.tsx              →  /painel  (Dashboard)
-│
-└── api/
-    └── auth/[...all]/
-        route.ts              →  /api/auth/*  (BetterAuth handler)
-```
-
 ### Tabela de rotas
 
-| Método     | Rota                | Componente            | Auth           | Descrição                 |
-| ---------- | ------------------- | --------------------- | -------------- | ------------------------- |
-| `GET`      | `/`                 | `TabletStandbyPage`   | Público        | Tela standby do totem     |
-| `GET`      | `/painel`           | `PainelDashboardPage` | `profissional` | Dashboard da fila         |
-| `GET`      | `/painel/historico` | _(a implementar)_     | `profissional` | Histórico completo        |
-| `GET`      | `/painel/usuarios`  | _(a implementar)_     | `profissional` | Gestão de usuários        |
-| `GET/POST` | `/api/auth/*`       | BetterAuth            | —              | Endpoints de autenticação |
+| Rota                 | Acesso                 | Descrição                                   |
+| -------------------- | ---------------------- | ------------------------------------------- |
+| `/`                  | Público                | Redireciona para `/recepcao`                |
+| `/recepcao`          | Público                | Totem de autoatendimento                    |
+| `/tv`                | Público                | Fila pública para TV                        |
+| `/monitor`           | Público                | Monitor público da fila                     |
+| `/adm/login`         | Apenas não autenticado | Login de profissionais e admin              |
+| `/adm`               | Autenticado            | Dashboard da fila ativa                     |
+| `/adm/historico`     | Autenticado            | Atendimentos do dia / arquivamento do turno |
+| `/adm/equipe`        | `admin`                | Gerenciamento da equipe                     |
+| `/adm/usuarios`      | `admin`                | Gestão de usuários                          |
+| `/adm/usuarios/novo` | `admin`                | Cadastro de profissional                    |
+| `/esqueci-a-senha`   | Apenas não autenticado | Solicitação de recuperação de senha         |
+| `/redefinir-senha`   | Apenas não autenticado | Redefinição de senha via token              |
+| `/api/auth/*`        | —                      | Endpoints do BetterAuth                     |
+
+URLs antigas `/painel/*` redirecionam para `/adm/*`.
+
+A autenticação é verificada em `src/proxy.ts`. A restrição ao role `admin` é feita no servidor, em cada página (`forbidden()` → `src/app/forbidden.tsx`) e nas Server Actions.
 
 ### Endpoints BetterAuth gerados automaticamente
 
-| Endpoint                   | Método | Descrição                            |
-| -------------------------- | ------ | ------------------------------------ |
-| `/api/auth/sign-up/email`  | `POST` | Cadastro com e-mail/senha            |
-| `/api/auth/sign-in/email`  | `POST` | Login com e-mail/senha               |
-| `/api/auth/sign-out`       | `POST` | Logout                               |
-| `/api/auth/session`        | `GET`  | Sessão atual                         |
-| `/api/auth/admin/set-role` | `POST` | Alterar role (requer `profissional`) |
+| Endpoint                   | Método | Descrição                   |
+| -------------------------- | ------ | --------------------------- |
+| `/api/auth/sign-up/email`  | `POST` | Cadastro com e-mail/senha   |
+| `/api/auth/sign-in/email`  | `POST` | Login com e-mail/senha      |
+| `/api/auth/sign-out`       | `POST` | Logout                      |
+| `/api/auth/session`        | `GET`  | Sessão atual                |
+| `/api/auth/admin/set-role` | `POST` | Alterar role (plugin Admin) |
 
 ---
 
@@ -346,29 +340,15 @@ Avatar do assistente virtual. Placeholder visual com `role="img"` e `aria-label`
 
 ### Painel (área do profissional)
 
-#### `Sidebar`
+O layout `src/app/adm/layout.tsx` (Client Component) monta o shell do painel e oculta o header em modo tela cheia.
 
-`src/components/painel/Sidebar.tsx` — **Client Component**
-
-Navegação lateral com detecção de rota ativa via `usePathname()`. Correspondência exata para `/painel` evita falso-ativo em sub-rotas.
-
-| Link      | Ícone             | Rota                |
-| --------- | ----------------- | ------------------- |
-| Dashboard | `LayoutDashboard` | `/painel`           |
-| Histórico | `History`         | `/painel/historico` |
-| Usuários  | `Users`           | `/painel/usuarios`  |
-
-#### `Header`
-
-`src/components/painel/Header.tsx` — **Server Component**
-
-Busca a sessão do usuário no servidor via `auth.api.getSession()`. Renderiza nome do profissional logado e `<SignOutButton>`.
-
-#### `SignOutButton`
-
-`src/components/painel/SignOutButton.tsx` — **Client Component**
-
-Chama `signOut()` do `auth-client` e redireciona para `/` (totem) após logout.
+| Componente         | Descrição                                                          |
+| ------------------ | ------------------------------------------------------------------ |
+| `PainelHeader`     | Header com usuário logado, `NotificationBell`, tela cheia e logout |
+| `BottomNav`        | Navegação inferior: Início, Histórico, Gerenciamento, Usuários     |
+| `NotificationBell` | Notificações de novos pacientes (`Notificacao`)                    |
+| `SignOutButton`    | Logout via `auth-client`                                           |
+| `AtendimentoCard`  | Card de paciente na fila                                           |
 
 ---
 
@@ -442,10 +422,12 @@ auth-client.ts ─── HTTP ──► /api/auth/[...all]/route.ts
 
 ### Roles
 
-| Role         | Valor            | Acesso                             |
-| ------------ | ---------------- | ---------------------------------- |
-| Paciente     | `"paciente"`     | Totem `/` — criação de atendimento |
-| Profissional | `"profissional"` | Painel `/painel` — gestão da fila  |
+| Role         | Valor            | Acesso                                                 |
+| ------------ | ---------------- | ------------------------------------------------------ |
+| Profissional | `"profissional"` | Painel `/adm` — fila e histórico                       |
+| Admin        | `"admin"`        | Tudo do profissional + `/adm/equipe` e `/adm/usuarios` |
+
+Pacientes **não** são usuários do sistema: o totem é público e o `Atendimento` guarda apenas `nomePaciente`.
 
 ### Campos do usuário
 
@@ -454,7 +436,7 @@ auth-client.ts ─── HTTP ──► /api/auth/[...all]/route.ts
 | `id`           | `string`    | Sim                       | Identificador único                |
 | `name`         | `string`    | Sim                       | Nome completo                      |
 | `email`        | `string`    | Sim                       | E-mail de login                    |
-| `role`         | `string`    | Sim                       | `paciente` ou `profissional`       |
+| `role`         | `string`    | Sim                       | `profissional` ou `admin`          |
 | `cpf`          | `string`    | **Não**                   | Dado sensível — apenas server-side |
 | `ultimoAcesso` | `DateTime?` | Sim                       | Timestamp do último acesso         |
 
@@ -537,7 +519,7 @@ pnpm prepare              # Instala Husky
 
 ### Rotas de autenticação
 
-- `/painel/login`: login de profissionais e admin
+- `/adm/login`: login de profissionais e admin
 - `/esqueci-a-senha`: solicitação de recuperação de senha
 - `/redefinir-senha`: redefinição de senha via token
 
