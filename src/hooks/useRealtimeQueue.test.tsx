@@ -7,149 +7,205 @@ import {
   useRealtimeQueue,
 } from "./useRealtimeQueue";
 
-type Handler = (payload: { new: unknown }) => void;
+type Handler = (payload: { new?: unknown; old?: unknown }) => void;
 
-let insertHandler: Handler | null = null;
-let updateHandler: Handler | null = null;
+// vi.mock é içado para o topo do arquivo; os mocks precisam ser criados
+// com vi.hoisted para já existirem quando a factory for executada.
+const mocks = vi.hoisted(() => {
+  const handlers: Record<string, Handler | undefined> = {};
 
-const channelMock = {
-  on: vi.fn((_: string, filter: { event: string }, callback: Handler) => {
-    if (filter.event === "INSERT") insertHandler = callback;
-    if (filter.event === "UPDATE") updateHandler = callback;
-    return channelMock;
-  }),
-  subscribe: vi.fn(() => channelMock),
-};
+  const channel = {
+    on: vi.fn((_: string, filter: { event: string }, callback: Handler) => {
+      handlers[filter.event] = callback;
+      return channel;
+    }),
+    subscribe: vi.fn(() => channel),
+  };
 
-const supabaseMock = {
-  channel: vi.fn(() => channelMock),
-  removeChannel: vi.fn(),
-};
+  const supabase = {
+    channel: vi.fn(() => channel),
+    removeChannel: vi.fn(() => Promise.resolve("ok")),
+  };
 
-const tocarAlertaUrgente = vi.fn();
-const pararAlertaUrgente = vi.fn();
-const tocarNotificacao = vi.fn();
+  return { handlers, channel, supabase };
+});
 
 vi.mock("@/lib/supabase-client", () => ({
-  supabase: supabaseMock,
-  CANAL_FILA: "fila-atendimento",
+  supabase: mocks.supabase,
+  CANAL_FILA: "public:Atendimento",
 }));
 
-vi.mock("@/hooks/useCampainha", () => ({
-  useCampainha: () => ({ tocarAlertaUrgente, pararAlertaUrgente, tocarNotificacao }),
-}));
+type ItemFila = { id: string; nomePaciente: string; tipoChamada: string; status: string };
+
+function atendimento(overrides: Partial<ItemFila> & { id: string; criadoEm: string }) {
+  return {
+    nomePaciente: "Ana",
+    tipoChamada: "normal",
+    status: "aguardando",
+    finalizadoEm: null,
+    ...overrides,
+  };
+}
 
 function HookHarness() {
   useRealtimeQueue();
   return null;
 }
 
+function renderHook(queryClient: QueryClient) {
+  return render(
+    <QueryClientProvider client={queryClient}>
+      <HookHarness />
+    </QueryClientProvider>
+  );
+}
+
+function filaAtiva(queryClient: QueryClient) {
+  return queryClient.getQueryData<ItemFila[]>(FILA_ATIVA_QUERY_KEY) ?? [];
+}
+
 beforeEach(() => {
-  insertHandler = null;
-  updateHandler = null;
+  for (const key of Object.keys(mocks.handlers)) delete mocks.handlers[key];
   vi.clearAllMocks();
+  vi.spyOn(console, "info").mockImplementation(() => {});
+  vi.spyOn(console, "warn").mockImplementation(() => {});
 });
 
 describe("useRealtimeQueue", () => {
-  it("toca notificacao e invalida fila ao receber INSERT normal", async () => {
-    const queryClient = new QueryClient();
-    const invalidateSpy = vi.spyOn(queryClient, "invalidateQueries");
+  it("assina INSERT, UPDATE e DELETE na tabela atendimento", async () => {
+    renderHook(new QueryClient());
 
-    render(
-      <QueryClientProvider client={queryClient}>
-        <HookHarness />
-      </QueryClientProvider>
+    await waitFor(() => expect(mocks.channel.subscribe).toHaveBeenCalled());
+
+    const eventos = mocks.channel.on.mock.calls.map(([tipo, filtro]) => ({ tipo, ...filtro }));
+    expect(eventos).toEqual(
+      ["INSERT", "UPDATE", "DELETE"].map((event) => ({
+        tipo: "postgres_changes",
+        event,
+        schema: "public",
+        table: "atendimento",
+      }))
     );
-
-    await waitFor(() => expect(insertHandler).toBeTypeOf("function"));
-
-    insertHandler?.({
-      new: {
-        id: "a1",
-        pacienteId: "p1",
-        paciente: { id: "p1", name: "Ana" },
-        tipoChamada: "normal",
-        status: "aguardando",
-        criadoEm: new Date("2026-03-17T10:00:00.000Z"),
-        finalizadoEm: null,
-      },
-    });
-
-    const fila = queryClient.getQueryData<unknown[]>(FILA_ATIVA_QUERY_KEY) ?? [];
-
-    expect(fila).toHaveLength(1);
-    expect(tocarNotificacao).toHaveBeenCalledTimes(1);
-    expect(tocarAlertaUrgente).not.toHaveBeenCalled();
-    expect(invalidateSpy).toHaveBeenCalledWith({ queryKey: FILA_ATIVA_QUERY_KEY });
   });
 
-  it("toca alerta urgente em loop ao receber INSERT urgente", async () => {
+  it("adiciona o atendimento à fila ao receber INSERT", async () => {
     const queryClient = new QueryClient();
+    renderHook(queryClient);
+    await waitFor(() => expect(mocks.handlers.INSERT).toBeTypeOf("function"));
 
-    render(
-      <QueryClientProvider client={queryClient}>
-        <HookHarness />
-      </QueryClientProvider>
-    );
+    mocks.handlers.INSERT?.({
+      new: atendimento({ id: "a1", nomePaciente: "Ana", criadoEm: "2026-03-17T10:00:00.000Z" }),
+    });
 
-    await waitFor(() => expect(insertHandler).toBeTypeOf("function"));
+    expect(filaAtiva(queryClient)).toEqual([
+      expect.objectContaining({ id: "a1", nomePaciente: "Ana", status: "aguardando" }),
+    ]);
+  });
 
-    insertHandler?.({
-      new: {
+  it("ordena urgentes primeiro e depois por ordem de chegada", async () => {
+    const queryClient = new QueryClient();
+    renderHook(queryClient);
+    await waitFor(() => expect(mocks.handlers.INSERT).toBeTypeOf("function"));
+
+    mocks.handlers.INSERT?.({
+      new: atendimento({ id: "n1", criadoEm: "2026-03-17T10:00:00.000Z" }),
+    });
+    mocks.handlers.INSERT?.({
+      new: atendimento({ id: "n2", criadoEm: "2026-03-17T10:01:00.000Z" }),
+    });
+    mocks.handlers.INSERT?.({
+      new: atendimento({
         id: "u1",
-        pacienteId: "p2",
-        paciente: { id: "p2", name: "Joao" },
-        tipoChamada: "urgente",
-        status: "aguardando",
-        criadoEm: new Date("2026-03-17T10:05:00.000Z"),
-        finalizadoEm: null,
-      },
+        tipoChamada: "URGENTE",
+        criadoEm: "2026-03-17T10:02:00.000Z",
+      }),
     });
 
-    expect(tocarAlertaUrgente).toHaveBeenCalledTimes(1);
-    expect(tocarNotificacao).not.toHaveBeenCalled();
+    expect(filaAtiva(queryClient).map((item) => item.id)).toEqual(["u1", "n1", "n2"]);
+    expect(filaAtiva(queryClient)[0].tipoChamada).toBe("urgente");
   });
 
-  it("remove da fila e para alerta quando urgente finaliza", async () => {
+  it("ignora INSERT sem id", async () => {
+    const queryClient = new QueryClient();
+    renderHook(queryClient);
+    await waitFor(() => expect(mocks.handlers.INSERT).toBeTypeOf("function"));
+
+    mocks.handlers.INSERT?.({ new: { nomePaciente: "Sem id" } });
+
+    expect(filaAtiva(queryClient)).toHaveLength(0);
+  });
+
+  it("remove da fila e sincroniza o histórico quando o atendimento é finalizado", async () => {
     const queryClient = new QueryClient();
     const invalidateSpy = vi.spyOn(queryClient, "invalidateQueries");
-
     queryClient.setQueryData(FILA_ATIVA_QUERY_KEY, [
-      {
-        id: "u1",
-        pacienteId: "p2",
-        paciente: { id: "p2", name: "Joao" },
-        tipoChamada: "urgente",
-        status: "aguardando",
-        criadoEm: new Date("2026-03-17T10:05:00.000Z"),
-        finalizadoEm: null,
-      },
+      atendimento({ id: "u1", tipoChamada: "urgente", criadoEm: "2026-03-17T10:05:00.000Z" }),
     ]);
 
-    render(
-      <QueryClientProvider client={queryClient}>
-        <HookHarness />
-      </QueryClientProvider>
-    );
+    renderHook(queryClient);
+    await waitFor(() => expect(mocks.handlers.UPDATE).toBeTypeOf("function"));
 
-    await waitFor(() => expect(updateHandler).toBeTypeOf("function"));
-
-    updateHandler?.({
+    mocks.handlers.UPDATE?.({
       new: {
-        id: "u1",
-        pacienteId: "p2",
-        paciente: { id: "p2", name: "Joao" },
-        tipoChamada: "urgente",
+        ...atendimento({ id: "u1", tipoChamada: "urgente", criadoEm: "2026-03-17T10:05:00.000Z" }),
         status: "finalizado",
-        criadoEm: new Date("2026-03-17T10:05:00.000Z"),
-        finalizadoEm: new Date("2026-03-17T10:12:00.000Z"),
+        finalizadoEm: "2026-03-17T10:12:00.000Z",
       },
     });
 
-    const fila = queryClient.getQueryData<unknown[]>(FILA_ATIVA_QUERY_KEY) ?? [];
+    expect(filaAtiva(queryClient)).toHaveLength(0);
+    expect(invalidateSpy).toHaveBeenCalledWith({
+      queryKey: ATENDIMENTOS_DIA_QUERY_KEY,
+      refetchType: "none",
+    });
+  });
 
-    expect(fila).toHaveLength(0);
-    expect(pararAlertaUrgente).toHaveBeenCalledTimes(1);
-    expect(invalidateSpy).toHaveBeenCalledWith({ queryKey: ATENDIMENTOS_DIA_QUERY_KEY });
+  it("não sincroniza o histórico em UPDATE que mantém o atendimento aguardando", async () => {
+    const queryClient = new QueryClient();
+    const invalidateSpy = vi.spyOn(queryClient, "invalidateQueries");
+    renderHook(queryClient);
+    await waitFor(() => expect(mocks.handlers.UPDATE).toBeTypeOf("function"));
+
+    mocks.handlers.UPDATE?.({
+      new: atendimento({
+        id: "a1",
+        nomePaciente: "Ana Souza",
+        criadoEm: "2026-03-17T10:00:00.000Z",
+      }),
+    });
+
+    expect(filaAtiva(queryClient)).toEqual([
+      expect.objectContaining({ id: "a1", nomePaciente: "Ana Souza" }),
+    ]);
+    expect(invalidateSpy).not.toHaveBeenCalled();
+  });
+
+  it("remove da fila e sincroniza o histórico ao receber DELETE", async () => {
+    const queryClient = new QueryClient();
+    const invalidateSpy = vi.spyOn(queryClient, "invalidateQueries");
+    queryClient.setQueryData(FILA_ATIVA_QUERY_KEY, [
+      atendimento({ id: "a1", criadoEm: "2026-03-17T10:00:00.000Z" }),
+      atendimento({ id: "a2", criadoEm: "2026-03-17T10:01:00.000Z" }),
+    ]);
+
+    renderHook(queryClient);
+    await waitFor(() => expect(mocks.handlers.DELETE).toBeTypeOf("function"));
+
+    mocks.handlers.DELETE?.({ old: { id: "a1" } });
+
+    expect(filaAtiva(queryClient).map((item) => item.id)).toEqual(["a2"]);
+    expect(invalidateSpy).toHaveBeenCalledWith({
+      queryKey: ATENDIMENTOS_DIA_QUERY_KEY,
+      refetchType: "none",
+    });
+  });
+
+  it("remove o canal ao desmontar", async () => {
+    const { unmount } = renderHook(new QueryClient());
+    await waitFor(() => expect(mocks.channel.subscribe).toHaveBeenCalled());
+
+    unmount();
+
+    expect(mocks.supabase.removeChannel).toHaveBeenCalledWith(mocks.channel);
   });
 });

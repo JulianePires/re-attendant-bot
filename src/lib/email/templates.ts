@@ -8,6 +8,19 @@
  * - Em português (PT-BR)
  */
 
+/**
+ * Escapa caracteres especiais de HTML em valores fornecidos pelo usuário
+ * (ex.: nome) antes de interpolá-los no template.
+ */
+function escapeHtml(value: string): string {
+  return value
+    .replace(/&/g, "&amp;")
+    .replace(/</g, "&lt;")
+    .replace(/>/g, "&gt;")
+    .replace(/"/g, "&quot;")
+    .replace(/'/g, "&#39;");
+}
+
 interface PasswordResetEmailProps {
   resetLink: string;
   recipientName?: string;
@@ -181,7 +194,7 @@ export function PasswordResetEmailTemplate({
           <!-- Conteúdo Principal -->
           <div class="content">
             <p class="greeting">
-              Olá,
+              Olá ${escapeHtml(recipientName)},
             </p>
 
             <p class="message">
@@ -196,7 +209,7 @@ export function PasswordResetEmailTemplate({
             <!-- Aviso de Segurança -->
             <div class="security-notice">
               <strong>⚠️ Aviso de Segurança</strong>
-              Este link expira em <span class="highlight">${expiryHours} hora</span>. Se você não solicitou esta alteração, ignore este email. Sua conta permanecerá segura.
+              Este link expira em <span class="highlight">${expiryHours} hora</span>. Se você não solicitou esta alteração, ignore este e-mail. Sua conta permanecerá segura.
             </div>
 
             <!-- Fallback Link -->
@@ -209,7 +222,7 @@ export function PasswordResetEmailTemplate({
 
             <!-- Informações Adicionais -->
             <p style="font-size: 14px; color: #6b7280; margin-top: 20px;">
-              <strong>💡 Dica:</strong> Guarde seu link seguro. Não compartilhe este email com outras pessoas.
+              <strong>💡 Dica:</strong> Guarde seu link seguro. Não compartilhe este e-mail com outras pessoas.
             </p>
           </div>
 
@@ -317,7 +330,7 @@ export function PasswordChangedEmailTemplate(recipientName?: string): string {
             <div class="success-icon">🎉</div>
             <h2>Senha Alterada com Sucesso</h2>
             <p class="message">
-              Olá ${recipientName || "Profissional"},<br><br>
+              Olá ${escapeHtml(recipientName || "Profissional")},<br><br>
               Sua senha foi redefinida com sucesso. Você agora pode fazer login com sua nova senha.
             </p>
           </div>

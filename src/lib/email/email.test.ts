@@ -70,7 +70,23 @@ describe("Email Templates", () => {
       const html = PasswordResetEmailTemplate({ resetLink });
 
       expect(html).toContain(resetLink);
-      expect(html).toContain('href="${resetLink}"');
+      expect(html).toContain(`href="${resetLink}"`);
+    });
+
+    it("usa saudação padrão quando o nome não é informado", () => {
+      const html = PasswordResetEmailTemplate({ resetLink: "https://app.local/reset" });
+
+      expect(html).toContain("Olá Profissional,");
+    });
+
+    it("escapa HTML no nome do destinatário", () => {
+      const html = PasswordResetEmailTemplate({
+        resetLink: "https://app.local/reset",
+        recipientName: '<img src=x onerror="alert(1)">',
+      });
+
+      expect(html).not.toContain("<img src=x");
+      expect(html).toContain("&lt;img src=x onerror=&quot;alert(1)&quot;&gt;");
     });
 
     it("deve incluir aviso de segurança", () => {
@@ -207,7 +223,7 @@ describe("Email Localization (PT-BR)", () => {
     });
 
     expect(html).toContain("Redefinir Senha");
-    expect(html).toContain("E-mail");
+    expect(html).toContain("e-mail");
     expect(html).toContain("Segurança");
   });
 
