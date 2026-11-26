@@ -55,7 +55,7 @@ Git hooks: pre-commit runs `lint-staged` (eslint --fix + prettier); commit-msg r
 
 ### Domain model (`prisma/schema.prisma`)
 
-- `Atendimento`: `status` `aguardando → finalizado`, `tipoChamada` `normal|urgente` (plain strings, constants in `src/types/index.ts`), `arquivadoTurno` flag.
+- `Atendimento`: `status` `aguardando → finalizado`, `tipoChamada` `normal|urgente` (plain strings, constants in `src/types/index.ts`), `arquivadoTurno` flag, optional unique `consultaHash` (SHA-256 of the CRM `consulta_id`, never the raw id — the public TV reads this table; ADR 0004). Patients confirmed on the CRM test kiosk enter the queue via `src/server/fila.ts` (`server-only`, deliberately not a Server Action).
 - **Shifts (turnos)**: `src/lib/utils/turnos.ts` defines manhã (06–12), tarde (12–18), noite. The active queue/day views are scoped to the current shift, and "closing" a shift sets `arquivadoTurno = true` rather than deleting rows.
 - BetterAuth tables use `@@map` to lowercase table names (`user`, `session`, …).
 

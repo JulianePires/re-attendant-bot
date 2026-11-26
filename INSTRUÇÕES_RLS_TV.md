@@ -108,6 +108,8 @@ WHERE tablename = 'atendimento';
 - Modificar ou deletar atendimentos existentes
 - Acessar atendimentos finalizados ou dados históricos
 
+⚠️ **Colunas visíveis:** a política vale para a linha inteira, então a role `anon` lê todas as colunas, inclusive `nomePaciente` e `consultaHash`. Por isso a tabela nunca guarda dado do CRM em claro: `consultaHash` é só o hash SHA-256 do `consulta_id` (`docs/adr/0004-vinculo-do-atendimento-a-consulta.md`). Antes de adicionar uma coluna, considere que ela fica pública.
+
 ## Notas Adicionais
 
 ### Chaves de API

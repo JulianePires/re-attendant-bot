@@ -42,3 +42,18 @@ export function registrarChamadaCrm(dados: DadosChamadaCrm): void {
     console.info(linha);
   }
 }
+
+/**
+ * Falha ao colocar na fila um paciente que o CRM já confirmou (UC-002 E8). Vai em `warn`
+ * porque o paciente foi mandado à recepção. Só o código do erro e a correlação saem.
+ */
+export function registrarFalhaFila(dados: { correlacao: string; codigo?: string }): void {
+  console.warn(
+    JSON.stringify({
+      evento: "fila.entrar",
+      resultado: "falha",
+      codigo: dados.codigo,
+      correlacao: dados.correlacao,
+    })
+  );
+}

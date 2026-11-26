@@ -5,6 +5,11 @@ import { MENSAGEM_ERRO_TECNICO, MENSAGEM_TELEFONE_INVALIDO } from "@/lib/crm/men
 vi.mock("server-only", () => ({}));
 vi.mock("next/headers", () => ({ cookies: vi.fn() }));
 
+const { entrarNaFilaPorConsultaMock } = vi.hoisted(() => ({
+  entrarNaFilaPorConsultaMock: vi.fn(),
+}));
+vi.mock("@/server/fila", () => ({ entrarNaFilaPorConsulta: entrarNaFilaPorConsultaMock }));
+
 import { cookies } from "next/headers";
 import {
   gerarAutorizacao,
@@ -69,6 +74,8 @@ beforeEach(() => {
   } as never);
   definirCookieAcesso(gerarAutorizacao(CHAVE_ACESSO, "dispositivo-1"));
   limitadorBuscas.reiniciar();
+  entrarNaFilaPorConsultaMock.mockReset();
+  entrarNaFilaPorConsultaMock.mockResolvedValue("criado");
 });
 
 afterEach(() => {
@@ -1186,5 +1193,165 @@ describe("Cenário: O dispositivo não recebe o identificador da consulta", () =
     if (resultado.tipo === "encontrado") {
       expect(resultado.comprovante.length).toBeGreaterThan(0);
     }
+  });
+});
+
+const MSG_FALHA_FILA =
+  "Não foi possível concluir seu check-in agora. Por favor, procure a recepção.";
+
+function espiarConsole() {
+  return (["log", "info", "warn", "error"] as const).map((m) =>
+    vi.spyOn(console, m).mockImplementation(() => {})
+  );
+}
+
+function erroDeBanco() {
+  return Object.assign(new Error("banco fora do ar para Maria Souza"), { code: "P1001" });
+}
+
+describe("confirmarChegadaCheckin - entrada na fila (UC-003)", () => {
+  describe("Cenário: Chegada confirmada coloca a paciente na fila", () => {
+    it("calls the queue once with the full name and consulta_id after the CRM confirms", async () => {
+      const comprovante = await obterComprovante();
+      fetchMock.mockResolvedValue(respostaHttp(respostaConfirmacaoSucesso));
+
+      const resultado = await confirmarChegadaCheckin(comprovante);
+
+      expect(entrarNaFilaPorConsultaMock).toHaveBeenCalledTimes(1);
+      expect(entrarNaFilaPorConsultaMock).toHaveBeenCalledWith({
+        nome: "Maria Souza",
+        consultaId: consultaIdLocalizada,
+      });
+      expect(resultado).toEqual({
+        tipo: "chegada_registrada",
+        mensagem: respostaConfirmacaoSucesso.corpo.mensagem,
+      });
+    });
+  });
+
+  describe("Cenário: Chegada já registrada sem atendimento local", () => {
+    it("puts the patient in the queue when the CRM answers ja_registrado", async () => {
+      const comprovante = await obterComprovante();
+      fetchMock.mockResolvedValue(respostaHttp(respostaConfirmacaoJaRegistrado));
+
+      const resultado = await confirmarChegadaCheckin(comprovante);
+
+      expect(entrarNaFilaPorConsultaMock).toHaveBeenCalledTimes(1);
+      expect(entrarNaFilaPorConsultaMock).toHaveBeenCalledWith({
+        nome: "Maria Souza",
+        consultaId: consultaIdLocalizada,
+      });
+      expect(resultado).toEqual({
+        tipo: "chegada_registrada",
+        mensagem: "Sua chegada já foi registrada.",
+      });
+    });
+  });
+
+  describe("Cenário: Confirmação repetida não duplica a fila", () => {
+    it.each([
+      ["sucesso", respostaConfirmacaoSucesso, respostaConfirmacaoSucesso.corpo.mensagem],
+      ["ja_registrado", respostaConfirmacaoJaRegistrado, "Sua chegada já foi registrada."],
+    ])(
+      "returns the success screen when the queue answers existente after CRM %s",
+      async (_rotulo, respostaCrm, mensagem) => {
+        const comprovante = await obterComprovante();
+        fetchMock.mockResolvedValue(respostaHttp(respostaCrm));
+        entrarNaFilaPorConsultaMock.mockResolvedValue("existente");
+
+        const resultado = await confirmarChegadaCheckin(comprovante);
+
+        expect(entrarNaFilaPorConsultaMock).toHaveBeenCalledTimes(1);
+        expect(resultado).toEqual({ tipo: "chegada_registrada", mensagem });
+      }
+    );
+  });
+
+  describe("Cenário: Falha na fila depois do CRM confirmar", () => {
+    it.each([
+      ["sucesso", respostaConfirmacaoSucesso],
+      ["ja_registrado", respostaConfirmacaoJaRegistrado],
+    ])(
+      "returns indisponivel with the reception message when the queue throws after CRM %s",
+      async (_rotulo, respostaCrm) => {
+        const comprovante = await obterComprovante();
+        espiarConsole();
+        fetchMock.mockResolvedValue(respostaHttp(respostaCrm));
+        entrarNaFilaPorConsultaMock.mockRejectedValue(erroDeBanco());
+
+        const resultado = await confirmarChegadaCheckin(comprovante);
+
+        expect(resultado).toEqual({ tipo: "indisponivel", mensagem: MSG_FALHA_FILA });
+        expect(fetchMock).toHaveBeenCalledTimes(1);
+      }
+    );
+
+    it("logs one fila.entrar warn line with the error code and no personal data", async () => {
+      const comprovante = await obterComprovante();
+      const espioes = espiarConsole();
+      const warn = espioes[2];
+      fetchMock.mockResolvedValue(respostaHttp(respostaConfirmacaoSucesso));
+      entrarNaFilaPorConsultaMock.mockRejectedValue(erroDeBanco());
+
+      await confirmarChegadaCheckin(comprovante);
+
+      const linhasFila = warn.mock.calls
+        .map((args) => String(args[0]))
+        .filter((linha) => linha.includes("fila.entrar"))
+        .map((linha) => JSON.parse(linha));
+      expect(linhasFila).toHaveLength(1);
+      expect(linhasFila[0]).toMatchObject({
+        evento: "fila.entrar",
+        resultado: "falha",
+        codigo: "P1001",
+      });
+      expect(linhasFila[0].correlacao.length).toBeGreaterThan(0);
+      const todas = espioes.flatMap((e) => e.mock.calls).map((a) => JSON.stringify(a));
+      for (const proibido of ["Maria", "Souza", "11987654321", consultaIdLocalizada]) {
+        expect(todas.filter((l) => l.includes(proibido))).toEqual([]);
+      }
+    });
+  });
+
+  describe("Esquema do Cenário: Quando a fila NÃO é chamada", () => {
+    it.each([
+      [
+        "CRM responde nao_encontrada",
+        () => respostaHttp(respostaConfirmacaoNaoEncontrada),
+        "nao_encontrada",
+      ],
+      [
+        "CRM responde dados_invalidos",
+        () => respostaHttp(respostaConfirmacaoDadosInvalidos),
+        "impedimento",
+      ],
+      [
+        "CRM responde HTTP 500",
+        () => respostaHttp({ status: 500, corpo: { ok: false } }),
+        "indisponivel",
+      ],
+      ["CRM sem rede", () => Promise.reject(new TypeError("fetch failed")), "indisponivel"],
+    ])("does not call the queue when %s", async (_rotulo, resposta, tipoEsperado) => {
+      const comprovante = await obterComprovante();
+      espiarConsole();
+      fetchMock.mockImplementation(async () => resposta());
+
+      const resultado = await confirmarChegadaCheckin(comprovante);
+
+      expect(resultado.tipo).toBe(tipoEsperado);
+      expect(entrarNaFilaPorConsultaMock).not.toHaveBeenCalled();
+    });
+
+    it("does not call the queue when the comprovante is tampered", async () => {
+      const comprovante = await obterComprovante();
+      const meio = Math.floor(comprovante.length / 2);
+      const troca = comprovante[meio] === "A" ? "B" : "A";
+      const adulterado = comprovante.slice(0, meio) + troca + comprovante.slice(meio + 1);
+
+      const resultado = await confirmarChegadaCheckin(adulterado);
+
+      expect(resultado.tipo).toBe("indisponivel");
+      expect(entrarNaFilaPorConsultaMock).not.toHaveBeenCalled();
+    });
   });
 });

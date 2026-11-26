@@ -2,7 +2,7 @@ import { afterEach, beforeEach, describe, expect, it, vi } from "vitest";
 
 vi.mock("server-only", () => ({}));
 
-import { registrarChamadaCrm } from "./log";
+import { registrarChamadaCrm, registrarFalhaFila } from "./log";
 
 const dados = {
   operacao: "localizar" as "localizar" | "confirmar",
@@ -160,5 +160,59 @@ describe("registrarChamadaCrm", () => {
     expect(linha).not.toContain("Maria Souza");
     expect(JSON.parse(linha)).not.toHaveProperty("consultaId");
     expect(JSON.parse(linha)).not.toHaveProperty("nome");
+  });
+});
+
+describe("registrarFalhaFila", () => {
+  let info: ReturnType<typeof vi.spyOn>;
+  let warn: ReturnType<typeof vi.spyOn>;
+
+  beforeEach(() => {
+    info = vi.spyOn(console, "info").mockImplementation(() => {});
+    warn = vi.spyOn(console, "warn").mockImplementation(() => {});
+  });
+
+  afterEach(() => {
+    vi.restoreAllMocks();
+  });
+
+  it("escreve uma única linha via console.warn e nada em console.info", () => {
+    registrarFalhaFila({ correlacao: "fila-1", codigo: "P1001" });
+    expect(warn).toHaveBeenCalledTimes(1);
+    expect(info).not.toHaveBeenCalled();
+  });
+
+  it("escreve exatamente evento, resultado, codigo e correlacao", () => {
+    registrarFalhaFila({ correlacao: "fila-1", codigo: "P1001" });
+    expect(JSON.parse(warn.mock.calls[0][0] as string)).toEqual({
+      evento: "fila.entrar",
+      resultado: "falha",
+      codigo: "P1001",
+      correlacao: "fila-1",
+    });
+  });
+
+  it("omite o codigo quando ele não é informado", () => {
+    registrarFalhaFila({ correlacao: "fila-2" });
+    const obj = JSON.parse(warn.mock.calls[0][0] as string);
+    expect(obj).toEqual({ evento: "fila.entrar", resultado: "falha", correlacao: "fila-2" });
+  });
+
+  it("não escreve nome, consultaId nem telefone mesmo que o objeto traga esses campos", () => {
+    registrarFalhaFila({
+      correlacao: "fila-3",
+      codigo: "P2002",
+      nome: "Maria Souza",
+      consultaId: "3f1c2b9a-6d4e-4f8a-9b7c-2e5d1a0f8c34",
+      telefone: "11987654321",
+    } as never);
+    const linha = warn.mock.calls[0][0] as string;
+    expect(Object.keys(JSON.parse(linha)).sort()).toEqual(
+      ["codigo", "correlacao", "evento", "resultado"].sort()
+    );
+    expect(linha).not.toContain("Maria");
+    expect(linha).not.toContain("Souza");
+    expect(linha).not.toContain("3f1c2b9a");
+    expect(linha).not.toContain("11987654321");
   });
 });
