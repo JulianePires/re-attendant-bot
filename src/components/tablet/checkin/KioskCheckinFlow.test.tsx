@@ -80,13 +80,14 @@ const MENSAGEM_INDISPONIVEL =
 let user: ReturnType<typeof userEvent.setup>;
 
 async function clicar(nome: string) {
-  await user.click(await screen.findByRole("button", { name: nome }));
+  await user.click(await screen.findByRole("button", { name: nome, hidden: true }));
 }
 
 // Chamado só depois de a tela do telefone aparecer: o teclado já está montado.
 async function teclar(digitos: string) {
+  // getByRole calcula nome e visibilidade de todos os botões a cada tecla (lento no jsdom); texto + seletor é equivalente aqui.
   for (const d of digitos) {
-    await user.click(screen.getByRole("button", { name: d }));
+    fireEvent.click(screen.getByText(d, { selector: "button" }));
   }
 }
 
