@@ -1,9 +1,12 @@
 import { describe, expect, it } from "vitest";
 import {
   MENSAGEM_ERRO_TECNICO,
+  MENSAGEM_PROFISSIONAL_CHAMADO,
   MENSAGEM_TELEFONE_INVALIDO,
+  TEXTO_PADRAO_POR_CATEGORIA,
   falaConfirmacao,
   montarMensagemConfirmacao,
+  montarNotificacaoSemAgendamento,
 } from "./mensagens";
 
 describe("montarMensagemConfirmacao (Paciente encontra o agendamento de agora)", () => {
@@ -46,5 +49,35 @@ describe("falaConfirmacao", () => {
 
   it("não contém dígitos de telefone", () => {
     expect(falaConfirmacao("Maria")).not.toMatch(/\d/);
+  });
+});
+
+describe("TEXTO_PADRAO_POR_CATEGORIA", () => {
+  it("expõe exatamente os textos padrão de cada categoria", () => {
+    expect(TEXTO_PADRAO_POR_CATEGORIA).toEqual({
+      telefone_invalido: "Digite o telefone com DDD.",
+      nao_encontrado: "Não encontrei nenhum cadastro com esse número.",
+      fora_da_janela:
+        "Sua consulta de hoje ainda não está no horário de check-in. Por favor, procure a recepção.",
+      sem_agendamento: "Não encontrei agendamento para agora.",
+      ja_registrado: "Sua chegada já estava registrada. Aguarde, você será chamado(a) em breve.",
+      desconhecido: "Não foi possível continuar seu check-in. Por favor, procure a recepção.",
+    });
+  });
+});
+
+describe("MENSAGEM_PROFISSIONAL_CHAMADO", () => {
+  it("expõe a mensagem de profissional chamado", () => {
+    expect(MENSAGEM_PROFISSIONAL_CHAMADO).toBe(
+      "Tudo certo! Aguarde que logo um profissional chegará."
+    );
+  });
+});
+
+describe("montarNotificacaoSemAgendamento", () => {
+  it("monta a notificação da equipe com o nome informado", () => {
+    expect(montarNotificacaoSemAgendamento("João Pereira")).toBe(
+      "Sem agendamento: João Pereira quer falar com um profissional"
+    );
   });
 });

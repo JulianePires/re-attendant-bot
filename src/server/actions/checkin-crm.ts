@@ -1,5 +1,6 @@
 "use server";
 
+import { randomUUID } from "node:crypto";
 import { cookies } from "next/headers";
 import { z } from "zod";
 import {
@@ -11,11 +12,14 @@ import {
 } from "@/lib/crm/acesso";
 import { localizarNoCrm } from "@/lib/crm/client";
 import { checkinCrmHabilitado, obterChaveAcesso, obterConfigCrm } from "@/lib/crm/config";
+import { classificarMotivo, type CategoriaMotivo } from "@/lib/crm/contrato";
 import { limitadorBuscas } from "@/lib/crm/limitador";
+import { registrarLocalizacao } from "@/lib/crm/log";
 import {
   MENSAGEM_CHAVE_INVALIDA,
   MENSAGEM_ERRO_TECNICO,
   MENSAGEM_TELEFONE_INVALIDO,
+  TEXTO_PADRAO_POR_CATEGORIA,
 } from "@/lib/crm/mensagens";
 import { validarTelefone } from "@/lib/crm/telefone";
 
@@ -23,18 +27,42 @@ import { validarTelefone } from "@/lib/crm/telefone";
 // o maior formato aceito com máscara: "+55 (11) 98765-4321".
 const schemaEntradaTelefone = z.string().max(20);
 
+type TipoRespostaNegocio =
+  | "telefone_invalido"
+  | "nao_encontrado"
+  | "fora_da_janela"
+  | "sem_agendamento"
+  | "chegada_ja_registrada"
+  | "impedimento";
+
 export type RespostaLocalizarAgendamento =
   | {
       tipo: "encontrado";
       agendamento: { primeiroNome: string; hora: string; profissional: string };
     }
-  | { tipo: "telefone_invalido"; mensagem: string }
+  | { tipo: TipoRespostaNegocio; mensagem: string }
   | { tipo: "indisponivel"; mensagem: string };
 
 const INDISPONIVEL: RespostaLocalizarAgendamento = {
   tipo: "indisponivel",
   mensagem: MENSAGEM_ERRO_TECNICO,
 };
+
+// O dispositivo recebe a categoria, nunca o `motivo` bruto do CRM (RNF-001.3).
+const TIPO_POR_CATEGORIA: Record<CategoriaMotivo, TipoRespostaNegocio> = {
+  telefone_invalido: "telefone_invalido",
+  nao_encontrado: "nao_encontrado",
+  fora_da_janela: "fora_da_janela",
+  sem_agendamento: "sem_agendamento",
+  ja_registrado: "chegada_ja_registrada",
+  desconhecido: "impedimento",
+};
+
+function responderNegocio(motivo: string, mensagem?: string): RespostaLocalizarAgendamento {
+  const categoria = classificarMotivo(motivo);
+  const texto = mensagem?.trim() || TEXTO_PADRAO_POR_CATEGORIA[categoria];
+  return { tipo: TIPO_POR_CATEGORIA[categoria], mensagem: texto };
+}
 
 /**
  * Localiza o agendamento de agora pelo telefone (UC-001).
@@ -69,9 +97,21 @@ export async function localizarAgendamentoCheckin(
   // Só conta o que chegaria ao CRM: telefone inválido não consome o limite (E10).
   if (!limitadorBuscas.permitir(idDispositivo)) return INDISPONIVEL;
 
+  const inicio = Date.now();
   const resultado = await localizarNoCrm(config, validacao.digitos);
+  const categoria =
+    resultado.tipo === "negocio" ? classificarMotivo(resultado.motivo) : resultado.tipo;
 
-  // Provisório (S1-01): erros de negócio e técnicos ganham tratamento próprio em S1-02 e S1-03.
+  registrarLocalizacao({
+    categoria,
+    motivo: resultado.tipo === "negocio" ? resultado.motivo : undefined,
+    desconhecido: categoria === "desconhecido",
+    duracaoMs: Date.now() - inicio,
+    correlacao: randomUUID(),
+  });
+
+  if (resultado.tipo === "negocio") return responderNegocio(resultado.motivo, resultado.mensagem);
+  // Provisório (S1-01): erros técnicos ganham tratamento próprio no S1-03.
   if (resultado.tipo !== "encontrado") return INDISPONIVEL;
 
   const { primeiroNome, hora, profissional } = resultado.agendamento;

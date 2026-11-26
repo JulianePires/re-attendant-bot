@@ -16,6 +16,7 @@ Encontrar minha consulta de agora informando só o meu telefone, para avisar que
 ## Gatilho
 
 O paciente toca em "Tenho consulta agendada" na tela inicial da versão de teste.
+Na mesma tela, quem não tem agendamento toca em "Falar com um profissional" (fora deste caso de uso: nome e fila urgente, sem CRM, RF-001.18).
 
 ## Fluxo principal
 
@@ -39,9 +40,9 @@ O paciente toca em "Tenho consulta agendada" na tela inicial da versão de teste
 ## Fluxos de exceção
 
 - **E1 · Telefone ausente ou com menos de 10 dígitos** (passo 3 ou 5, `telefone_invalido`): o paciente vê "Digite o telefone com DDD." e continua no passo 3 para corrigir. [C, observado]
-- **E2 · Paciente não encontrado** (passo 5, `paciente_nao_encontrado`): o sistema exibe "Não encontrei nenhum cadastro com esse número." e oferece "Tentar outro telefone" (volta ao passo 2) ou "Voltar ao início". [C, observado / S nas opções]
+- **E2 · Paciente não encontrado** (passo 5, `paciente_nao_encontrado`): o sistema exibe a `mensagem` ("Não encontrei nenhum cadastro com esse número.") e oferece "Tentar outro telefone" (volta ao passo 2), "Falar com um profissional" (nome e fila urgente, sem CRM, com a indicação de sem agendamento na notificação da equipe, RF-001.18) ou "Voltar ao início". [C, observado / C nas opções]
 - **E3 · Consulta hoje, fora da janela** (passo 5, `fora_da_janela`): o sistema exibe a `mensagem` e oferece "Voltar ao início". [C, não observado]
-- **E4 · Nenhum agendamento para agora** (passo 5, `sem_agendamento_agora`): o sistema exibe a `mensagem` e oferece "Tentar outro telefone", "Entrar na fila pelo nome" (fluxo atual do `/recepcao`, fila normal, sem CRM) ou "Voltar ao início" (RF-001.19). [C]
+- **E4 · Nenhum agendamento para agora** (passo 5, `sem_agendamento_agora`): o sistema exibe a `mensagem` e oferece "Tentar outro telefone", "Falar com um profissional" (como em E2) ou "Voltar ao início". A fila normal não é oferecida: ela é só para quem tem agendamento (RF-001.19). [C]
 - **E5 · Erro de negócio sem `mensagem`** (passo 5): o sistema exibe a mensagem padrão daquele motivo (RF-001.23). [C]
 - **E6 · Motivo fora da tabela, como `dados_invalidos`** (passo 5): o sistema exibe a `mensagem` quando houver e, sem ela, a mensagem padrão de impedimento. Oferece "Voltar ao início" e registra o motivo para acompanhamento (RF-001.25, RNF-001.6). [C/V]
 - **E7 · HTTP 401** (passo 5, `token_ausente` ou `token_invalido`): erro técnico identificado pelo status. O sistema **ignora** a `mensagem` do corpo ("Só um instante..."), exibe a mensagem padrão "procure a recepção" e volta ao início em 15 s (RF-001.11). [C/V]

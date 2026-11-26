@@ -1,5 +1,6 @@
 "use server";
 
+import { montarNotificacaoSemAgendamento } from "@/lib/crm/mensagens";
 import { prisma } from "@/lib/prisma";
 import { obterTurnoAtual } from "@/lib/utils/turnos";
 import { StatusAtendimento, TipoChamada, TipoChamadaValue } from "@/types";
@@ -27,6 +28,7 @@ const schemaAtendimentoId = z.string().cuid("ID de atendimento inválido");
 async function criarNotificacoesParaEquipe(params: {
   nomePaciente: string;
   tipoChamada: TipoChamadaValue;
+  semAgendamento?: boolean;
 }) {
   const profissionais = await prisma.user.findMany({
     where: {
@@ -43,14 +45,21 @@ async function criarNotificacoesParaEquipe(params: {
     return;
   }
 
+  // Quem chamou pelo totem de teste sem agendamento aparece assim para a equipe (RF-001.18).
+  const titulo = params.semAgendamento
+    ? "Sem agendamento: falar com um profissional"
+    : params.tipoChamada === TipoChamada.URGENTE
+      ? "Paciente urgente na fila"
+      : "Novo paciente na fila";
+  const mensagem = params.semAgendamento
+    ? montarNotificacaoSemAgendamento(params.nomePaciente)
+    : `Novo Paciente: ${params.nomePaciente}`;
+
   await prismaWithNotificacao.notificacao.createMany({
     data: profissionais.map((profissional) => ({
       usuarioId: profissional.id,
-      titulo:
-        params.tipoChamada === TipoChamada.URGENTE
-          ? "Paciente urgente na fila"
-          : "Novo paciente na fila",
-      mensagem: `Novo Paciente: ${params.nomePaciente}`,
+      titulo,
+      mensagem,
       tipo: params.tipoChamada === TipoChamada.URGENTE ? "URGENTE" : "NORMAL",
     })),
   });
@@ -74,6 +83,8 @@ const schemaAtendimentoNaFila = z.object({
 export async function registrarEEntrarNaFila(dados: {
   nome: string;
   tipoChamada: TipoChamadaValue;
+  /** Só o totem de teste envia; sem ele, as notificações ficam como no /recepcao. */
+  semAgendamento?: boolean;
 }) {
   try {
     const nomePaciente = dados.nome.trim();
@@ -95,6 +106,7 @@ export async function registrarEEntrarNaFila(dados: {
     await criarNotificacoesParaEquipe({
       nomePaciente,
       tipoChamada: dados.tipoChamada,
+      semAgendamento: dados.semAgendamento === true,
     });
 
     return atendimento;

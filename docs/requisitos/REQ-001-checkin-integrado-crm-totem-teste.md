@@ -107,8 +107,8 @@ O check-in atual não tem vínculo com o agendamento. O paciente digita só o no
 - **RF-001.15 [C]:** A versão integrada fica em endereço próprio, no mesmo ambiente de produção, e o comportamento de `/recepcao`, `/tv`, `/monitor` e `/adm` não muda.
 - **RF-001.16 [S]:** A clínica consegue desativar a versão de teste sem mexer em `/recepcao`. Desativada, ela não fica acessível.
 - **RF-001.17 [P: Q-06]:** Um check-in confirmado (inclusive `ja_registrado`) coloca o paciente na fila local como chamada normal, uma única vez, com o nome definido em Q-06.
-- **RF-001.18 [P: Q-09]:** Na versão de teste, "urgente" continua com o comportamento atual (nome e fila urgente), sem CRM.
-- **RF-001.19 [C: Q-09]:** Quando a localização terminar em `sem_agendamento_agora`, o totem oferece "Entrar na fila pelo nome", que segue o fluxo atual do `/recepcao` (nome e fila normal, sem CRM).
+- **RF-001.18 [C: Q-09, decisão da usuária 2026-11-26]:** Na versão de teste, quem não tem agendamento usa "Falar com um profissional": o paciente informa o nome e entra na fila como chamada **urgente**, sem CRM, como o botão de urgência do `/recepcao`. A notificação da equipe informa que a pessoa não tem agendamento ("Sem agendamento: <nome> quer falar com um profissional"). O botão fica na tela inicial e nos resultados `sem_agendamento_agora` e `paciente_nao_encontrado`.
+- **RF-001.19 [C: decisão da usuária 2026-11-26]:** A fila comum (chamada normal) é só para quem tem agendamento: o totem de teste não oferece "Entrar na fila pelo nome" como chamada normal. A entrada na fila normal acontece depois do check-in confirmado (UC-002, Q-06).
 - **RF-001.20 [S]:** A clínica consegue distinguir quais check-ins e atendimentos vieram da versão integrada, para avaliar a homologação.
 - **RF-001.21 [S / C: Q-08]:** O totem orienta por voz cada etapa, sem pronunciar telefone nem procedimento. Quando fala o nome, usa só o `primeiro_nome`.
 - **RF-001.22 [P: Q-12]:** A versão de teste indica visualmente que é um ambiente de teste.
@@ -166,7 +166,6 @@ O check-in atual não tem vínculo com o agendamento. O paciente digita só o no
 - [ ] **Q-02:** Formato da resposta da localização quando há mais de um agendamento: lista, campo adicional, outro motivo? Sem isso não há como implementar RF-001.24. Responsável: fornecedor do CRM.
 - [ ] **Q-15:** Quando `ja_registrado` aparece na localização, a resposta traz `nome`/`primeiro_nome` e `consulta_id`? Sem eles o totem mostra "chegada registrada", mas não consegue colocar ou conferir o paciente na fila local (RF-001.17). Responsável: fornecedor do CRM.
 - [ ] **Q-07:** Durante o teste, os atendimentos dos registros de teste podem aparecer na fila real, com som e voz na TV? Responsável: cliente.
-- [ ] **Q-09 (parcial):** Na versão de teste, "urgente" continua igual, sem CRM? Muda RF-001.18. Responsável: cliente.
 - [ ] **Q-17:** O que aparece na TV e no monitor para um paciente vindo do check-in integrado? Depende de Q-06. Responsável: cliente.
 - [ ] **Q-16:** `dados_invalidos`, `token_ausente` e `token_invalido` são motivos oficiais? Existe uma lista completa de motivos? Responsável: fornecedor do CRM.
 - [ ] **Q-05:** A janela "hoje ±1h" usa o fuso America/Sao_Paulo? Responsável: fornecedor do CRM.
@@ -183,7 +182,7 @@ O check-in atual não tem vínculo com o agendamento. O paciente digita só o no
 - **Q-04 (parcial):** existem registros de teste e a cliente pode criar mais (RN-001.8). Falta cobrir cada caso.
 - **Campo do texto de erro:** é `mensagem`; não existe `situacao`.
 - **Q-08:** a mensagem de confirmação e a voz usam `primeiro_nome`, sem o procedimento (RF-001.3, RF-001.21, RNF-001.5). A exibição na TV e no monitor passou para Q-17.
-- **Q-09 (parcial):** com `sem_agendamento_agora`, o totem oferece "Entrar na fila pelo nome", como no `/recepcao` (RF-001.19). Falta a decisão sobre a urgência.
+- **Q-09:** sem agendamento → "Falar com um profissional" (nome, fila urgente, sem CRM), na tela inicial e nos resultados `sem_agendamento_agora` e `paciente_nao_encontrado`; a notificação da equipe indica "sem agendamento". A fila normal é só para agendados (RF-001.18, RF-001.19).
 - **Q-10:** chave de acesso no primeiro acesso do dispositivo e limite de 10 buscas por minuto por dispositivo (RNF-001.4).
 - **Escopo do UC-001 até Q-02, Q-06 e Q-15:** a escolha entre vários agendamentos (A5) vira um card separado, a criar quando houver exemplo da resposta. Com `ja_registrado` na localização (A6), o UC-001 só mostra a chegada registrada; o efeito na fila local fica para o UC-002.
 
