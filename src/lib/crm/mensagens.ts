@@ -10,6 +10,26 @@ export const MENSAGEM_ERRO_TECNICO =
 
 export const MENSAGEM_CHAVE_INVALIDA = "Chave de acesso inválida.";
 
+// Textos padrão quando o CRM não manda `mensagem` (RF-001.23, RF-001.25).
+// Provisórios até a cliente aprovar (REQ-001 Q-13).
+export const TEXTO_PADRAO_POR_CATEGORIA = {
+  telefone_invalido: MENSAGEM_TELEFONE_INVALIDO,
+  nao_encontrado: "Não encontrei nenhum cadastro com esse número.",
+  fora_da_janela:
+    "Sua consulta de hoje ainda não está no horário de check-in. Por favor, procure a recepção.",
+  sem_agendamento: "Não encontrei agendamento para agora.",
+  ja_registrado: "Sua chegada já estava registrada. Aguarde, você será chamado(a) em breve.",
+  desconhecido: "Não foi possível continuar seu check-in. Por favor, procure a recepção.",
+} as const;
+
+// Quem não tem agendamento fala com um profissional: chamada urgente (RF-001.18).
+export const MENSAGEM_PROFISSIONAL_CHAMADO =
+  "Tudo certo! Aguarde que logo um profissional chegará.";
+
+export function montarNotificacaoSemAgendamento(nome: string): string {
+  return `Sem agendamento: ${nome} quer falar com um profissional`;
+}
+
 export const FALA_PEDIR_TELEFONE = "Digite seu telefone com DDD e toque em buscar.";
 
 export const FALA_BOAS_VINDAS =

@@ -8,6 +8,7 @@ import {
   FALA_BOAS_VINDAS,
   FALA_PEDIR_TELEFONE,
   MENSAGEM_ERRO_TECNICO,
+  MENSAGEM_PROFISSIONAL_CHAMADO,
   falaConfirmacao,
   montarMensagemConfirmacao,
 } from "@/lib/crm/mensagens";
@@ -16,11 +17,44 @@ import {
   localizarAgendamentoCheckin,
   type RespostaLocalizarAgendamento,
 } from "@/server/actions/checkin-crm";
+import { EntradaNomeFila } from "./EntradaNomeFila";
 import { TecladoNumerico } from "./TecladoNumerico";
 
-type Etapa = "IDLE" | "HOME" | "TELEFONE" | "BUSCANDO" | "CONFIRMAR" | "INDISPONIVEL";
+type Etapa =
+  | "IDLE"
+  | "HOME"
+  | "TELEFONE"
+  | "BUSCANDO"
+  | "CONFIRMAR"
+  | "NEGOCIO"
+  | "CHEGADA_REGISTRADA"
+  | "FALAR_PROFISSIONAL"
+  | "PROFISSIONAL_CHAMADO"
+  | "INDISPONIVEL";
 
 type Agendamento = Extract<RespostaLocalizarAgendamento, { tipo: "encontrado" }>["agendamento"];
+
+// Respostas que mostram a tela de resultado: as demais têm tela própria.
+type ResultadoNegocio = {
+  tipo: Exclude<
+    RespostaLocalizarAgendamento["tipo"],
+    "encontrado" | "telefone_invalido" | "chegada_ja_registrada" | "indisponivel"
+  >;
+  mensagem: string;
+};
+
+// Volta ao início sozinho (RF-001.12, RF-001.13). Etapas fora da lista não têm
+// tempo: a tela inicial e a busca em andamento.
+const TEMPO_PARA_VOLTAR_MS: Partial<Record<Etapa, number>> = {
+  HOME: 30_000,
+  TELEFONE: 30_000,
+  CONFIRMAR: 30_000,
+  FALAR_PROFISSIONAL: 30_000,
+  INDISPONIVEL: 30_000,
+  NEGOCIO: 20_000,
+  CHEGADA_REGISTRADA: 10_000,
+  PROFISSIONAL_CHAMADO: 10_000,
+};
 
 type KioskCheckinFlowProps = {
   handleToggleTalking?: (falando: boolean) => void;
@@ -40,6 +74,10 @@ const BOTAO_PRIMARIO =
 const BOTAO_SECUNDARIO =
   "flex min-h-16 w-full cursor-pointer items-center justify-center rounded-xl border border-sky-700 bg-sky-900/80 px-6 text-xl font-semibold text-white transition-all active:scale-[0.98] focus-visible:ring-4 focus-visible:ring-emerald-400 focus-visible:outline-none";
 
+// Mesmo papel do botão de urgência do /recepcao; red-600 garante contraste AA com texto branco.
+const BOTAO_PROFISSIONAL =
+  "flex min-h-16 w-full cursor-pointer items-center justify-center rounded-xl border border-red-700 bg-red-600 px-6 text-xl font-semibold text-white transition-all hover:bg-red-700 active:scale-[0.98] focus-visible:ring-4 focus-visible:ring-red-300 focus-visible:outline-none";
+
 const CARTAO =
   "relative mx-auto flex w-full max-w-xl flex-col gap-5 rounded-3xl border border-sky-800/60 bg-sky-950/85 p-6 backdrop-blur-sm";
 
@@ -50,6 +88,10 @@ export function KioskCheckinFlow({ handleToggleTalking }: KioskCheckinFlowProps)
   const [erroTelefone, setErroTelefone] = useState<string | null>(null);
   const [agendamento, setAgendamento] = useState<Agendamento | null>(null);
   const [mensagemIndisponivel, setMensagemIndisponivel] = useState("");
+  const [resultadoNegocio, setResultadoNegocio] = useState<ResultadoNegocio | null>(null);
+  const [mensagemChegada, setMensagemChegada] = useState("");
+  // Cada toque reinicia a contagem de inatividade.
+  const [toques, setToques] = useState(0);
   // O estado só muda na próxima renderização; o ref bloqueia o segundo toque já no mesmo ciclo (E11).
   const buscandoRef = useRef(false);
 
@@ -68,6 +110,8 @@ export function KioskCheckinFlow({ handleToggleTalking }: KioskCheckinFlowProps)
     setErroTelefone(null);
     setAgendamento(null);
     setMensagemIndisponivel("");
+    setResultadoNegocio(null);
+    setMensagemChegada("");
   }
 
   function voltarAoInicio() {
@@ -80,6 +124,12 @@ export function KioskCheckinFlow({ handleToggleTalking }: KioskCheckinFlowProps)
   function irParaTelefone() {
     descartarDados();
     setEtapa("TELEFONE");
+  }
+
+  // O telefone digitado antes não serve para a chamada: é descartado (RNF-001.5).
+  function irParaFalarComProfissional() {
+    descartarDados();
+    setEtapa("FALAR_PROFISSIONAL");
   }
 
   function adicionarDigito(digito: string) {
@@ -106,6 +156,13 @@ export function KioskCheckinFlow({ handleToggleTalking }: KioskCheckinFlowProps)
       } else if (resposta.tipo === "telefone_invalido") {
         setErroTelefone(resposta.mensagem);
         setEtapa("TELEFONE");
+      } else if (resposta.tipo === "chegada_ja_registrada") {
+        // ja_registrado é sucesso: não chama a confirmação (RF-001.9).
+        setMensagemChegada(resposta.mensagem);
+        setEtapa("CHEGADA_REGISTRADA");
+      } else if (resposta.tipo !== "indisponivel") {
+        setResultadoNegocio({ tipo: resposta.tipo, mensagem: resposta.mensagem });
+        setEtapa("NEGOCIO");
       } else {
         setMensagemIndisponivel(resposta.mensagem);
         setEtapa("INDISPONIVEL");
@@ -134,10 +191,29 @@ export function KioskCheckinFlow({ handleToggleTalking }: KioskCheckinFlowProps)
       case "INDISPONIVEL":
         falarComRosto(mensagemIndisponivel);
         break;
+      case "NEGOCIO":
+        if (resultadoNegocio) falarComRosto(resultadoNegocio.mensagem);
+        break;
+      case "CHEGADA_REGISTRADA":
+        falarComRosto(mensagemChegada);
+        break;
+      case "PROFISSIONAL_CHAMADO":
+        falarComRosto(MENSAGEM_PROFISSIONAL_CHAMADO);
+        break;
     }
     // Fala só ao entrar na etapa.
     // eslint-disable-next-line react-hooks/exhaustive-deps
   }, [etapa]);
+
+  useEffect(() => {
+    const tempo = TEMPO_PARA_VOLTAR_MS[etapa];
+    if (tempo === undefined) return;
+
+    const temporizador = setTimeout(voltarAoInicio, tempo);
+    return () => clearTimeout(temporizador);
+    // A contagem recomeça a cada etapa nova ou toque.
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, [etapa, toques]);
 
   const transicao = {
     initial: { opacity: 0, y: 20 },
@@ -147,7 +223,11 @@ export function KioskCheckinFlow({ handleToggleTalking }: KioskCheckinFlowProps)
   };
 
   return (
-    <div className="pointer-events-none absolute inset-0 z-10 flex h-full w-full flex-col text-zinc-100 select-none">
+    <div
+      className="pointer-events-none absolute inset-0 z-10 flex h-full w-full flex-col text-zinc-100 select-none"
+      onClickCapture={() => setToques((n) => n + 1)}
+      onInputCapture={() => setToques((n) => n + 1)}
+    >
       <AnimatePresence mode="wait">
         {etapa === "IDLE" && (
           <motion.div
@@ -170,10 +250,18 @@ export function KioskCheckinFlow({ handleToggleTalking }: KioskCheckinFlowProps)
           <motion.div
             key="home"
             {...transicao}
-            className="pointer-events-auto mt-auto flex w-full justify-end px-6 pb-10"
+            className="pointer-events-auto mt-auto flex w-full justify-between gap-4 px-6 pb-10"
           >
             <button type="button" onClick={voltarAoInicio} className={BOTAO_VOLTAR}>
               <ArrowLeft className="h-6 w-6" aria-hidden="true" /> Voltar ao início
+            </button>
+            {/* Mesmo lugar do botão de urgência do /recepcao (RF-001.18). */}
+            <button
+              type="button"
+              onClick={irParaFalarComProfissional}
+              className={`${BOTAO_PROFISSIONAL} min-h-20 w-72`}
+            >
+              Falar com um profissional
             </button>
             <button
               type="button"
@@ -276,6 +364,86 @@ export function KioskCheckinFlow({ handleToggleTalking }: KioskCheckinFlowProps)
               <button type="button" onClick={irParaTelefone} className={BOTAO_SECUNDARIO}>
                 Não sou eu
               </button>
+            </section>
+          </motion.div>
+        )}
+
+        {etapa === "NEGOCIO" && resultadoNegocio && (
+          <motion.div
+            key="negocio"
+            {...transicao}
+            className="pointer-events-auto flex h-full w-full flex-col items-center justify-center px-4"
+          >
+            <section className={CARTAO} aria-label="Resultado da busca">
+              {/* O texto vem do CRM sem alteração; o motivo bruto não chega aqui (RF-001.8). */}
+              <p
+                role="alert"
+                className="text-center text-2xl leading-snug font-semibold text-white"
+              >
+                {resultadoNegocio.mensagem}
+              </p>
+              {(resultadoNegocio.tipo === "nao_encontrado" ||
+                resultadoNegocio.tipo === "sem_agendamento") && (
+                <button type="button" onClick={irParaTelefone} className={BOTAO_SECUNDARIO}>
+                  Tentar outro telefone
+                </button>
+              )}
+              {(resultadoNegocio.tipo === "nao_encontrado" ||
+                resultadoNegocio.tipo === "sem_agendamento") && (
+                <button
+                  type="button"
+                  onClick={irParaFalarComProfissional}
+                  className={BOTAO_PROFISSIONAL}
+                >
+                  Falar com um profissional
+                </button>
+              )}
+              <button type="button" onClick={voltarAoInicio} className={BOTAO_PRIMARIO}>
+                Voltar ao início
+              </button>
+            </section>
+          </motion.div>
+        )}
+
+        {etapa === "FALAR_PROFISSIONAL" && (
+          <motion.div
+            key="falar-profissional"
+            {...transicao}
+            className="pointer-events-auto flex h-full w-full flex-col items-center justify-center px-4"
+          >
+            <button type="button" onClick={voltarAoInicio} className={BOTAO_VOLTAR}>
+              <ArrowLeft className="h-6 w-6" aria-hidden="true" /> Voltar ao início
+            </button>
+            <EntradaNomeFila
+              classeCartao={CARTAO}
+              classeBotao={BOTAO_PRIMARIO}
+              onConcluido={() => setEtapa("PROFISSIONAL_CHAMADO")}
+              onErro={() => {
+                setMensagemIndisponivel(MENSAGEM_ERRO_TECNICO);
+                setEtapa("INDISPONIVEL");
+              }}
+            />
+          </motion.div>
+        )}
+
+        {(etapa === "CHEGADA_REGISTRADA" || etapa === "PROFISSIONAL_CHAMADO") && (
+          <motion.div
+            key="sucesso"
+            {...transicao}
+            className="pointer-events-auto flex h-full w-full flex-col items-center justify-center px-4"
+          >
+            <section
+              className={CARTAO}
+              aria-label={
+                etapa === "PROFISSIONAL_CHAMADO" ? "Profissional chamado" : "Chegada registrada"
+              }
+            >
+              <p
+                role="status"
+                className="text-center text-3xl leading-snug font-semibold text-emerald-300"
+              >
+                {etapa === "PROFISSIONAL_CHAMADO" ? MENSAGEM_PROFISSIONAL_CHAMADO : mensagemChegada}
+              </p>
             </section>
           </motion.div>
         )}

@@ -1,9 +1,5 @@
 import { afterEach, beforeEach, describe, expect, it, vi } from "vitest";
-import {
-  respostaPacienteNaoEncontrado,
-  respostaSucesso,
-  respostaTokenInvalido,
-} from "@/lib/crm/__fixtures__/localizar";
+import { respostaSucesso, respostaTokenInvalido } from "@/lib/crm/__fixtures__/localizar";
 import { MENSAGEM_ERRO_TECNICO, MENSAGEM_TELEFONE_INVALIDO } from "@/lib/crm/mensagens";
 
 vi.mock("server-only", () => ({}));
@@ -197,18 +193,7 @@ describe("localizarAgendamentoCheckin", () => {
     });
   });
 
-  describe("Provisório deste card: qualquer falha vira indisponivel", () => {
-    it("returns indisponivel with technical message on business error from the CRM", async () => {
-      fetchMock.mockResolvedValue(respostaHttp(respostaPacienteNaoEncontrado));
-
-      const resultado = await localizarAgendamentoCheckin("11987654321");
-
-      expect(resultado).toEqual({
-        tipo: "indisponivel",
-        mensagem: MENSAGEM_ERRO_TECNICO,
-      });
-    });
-
+  describe("Erros técnicos continuam indisponivel", () => {
     it("returns indisponivel with technical message on HTTP 401", async () => {
       fetchMock.mockResolvedValue(respostaHttp(respostaTokenInvalido));
 
@@ -283,6 +268,219 @@ describe("localizarAgendamentoCheckin", () => {
         const ok = await localizarAgendamentoCheckin("11987654321");
         expect(ok.tipo).toBe("encontrado");
       }
+    });
+  });
+});
+
+function corpoNegocio(motivo: string, mensagem?: string) {
+  return respostaHttp({
+    status: 200,
+    corpo: mensagem === undefined ? { ok: false, motivo } : { ok: false, motivo, mensagem },
+  });
+}
+
+function linhasLogLocalizar(espioes: { mock: { calls: unknown[][] } }[]) {
+  return espioes
+    .flatMap((e) => e.mock.calls)
+    .map((args) => String(args[0]))
+    .flatMap((linha) => {
+      try {
+        const json = JSON.parse(linha);
+        return json && json.evento === "crm.localizar" ? [json] : [];
+      } catch {
+        return [];
+      }
+    });
+}
+
+describe("localizarAgendamentoCheckin - respostas de negócio do CRM", () => {
+  describe("Cenário: Paciente não encontrado", () => {
+    it("returns nao_encontrado with the CRM message and without the raw motivo", async () => {
+      fetchMock.mockResolvedValue(
+        corpoNegocio("paciente_nao_encontrado", "Não encontrei nenhum cadastro com esse número.")
+      );
+
+      const resultado = await localizarAgendamentoCheckin("11900000000");
+
+      expect(resultado).toEqual({
+        tipo: "nao_encontrado",
+        mensagem: "Não encontrei nenhum cadastro com esse número.",
+      });
+      expect(JSON.stringify(resultado)).not.toContain("paciente_nao_encontrado");
+    });
+  });
+
+  describe("Cenário: Consulta de hoje fora da janela de check-in", () => {
+    it("returns fora_da_janela with the CRM message", async () => {
+      fetchMock.mockResolvedValue(
+        corpoNegocio("fora_da_janela", "Sua consulta é às 17:00. O check-in abre às 16:00.")
+      );
+
+      const resultado = await localizarAgendamentoCheckin("11911112222");
+
+      expect(resultado).toEqual({
+        tipo: "fora_da_janela",
+        mensagem: "Sua consulta é às 17:00. O check-in abre às 16:00.",
+      });
+    });
+  });
+
+  describe("Cenário: Nenhum agendamento para agora", () => {
+    it("returns sem_agendamento with the CRM message and without the raw motivo", async () => {
+      fetchMock.mockResolvedValue(
+        corpoNegocio("sem_agendamento_agora", "Não encontrei agendamento para agora.")
+      );
+
+      const resultado = await localizarAgendamentoCheckin("11933334444");
+
+      expect(resultado).toEqual({
+        tipo: "sem_agendamento",
+        mensagem: "Não encontrei agendamento para agora.",
+      });
+      expect(JSON.stringify(resultado)).not.toContain("sem_agendamento_agora");
+    });
+  });
+
+  describe("Cenário: Chegada já registrada na localização", () => {
+    it("returns chegada_ja_registrada with the CRM message and without the raw motivo", async () => {
+      fetchMock.mockResolvedValue(corpoNegocio("ja_registrado", "Sua chegada já foi registrada."));
+
+      const resultado = await localizarAgendamentoCheckin("11955556666");
+
+      expect(resultado).toEqual({
+        tipo: "chegada_ja_registrada",
+        mensagem: "Sua chegada já foi registrada.",
+      });
+      expect(JSON.stringify(resultado)).not.toContain("ja_registrado");
+    });
+  });
+
+  describe("Cenário: Motivo conhecido sem mensagem", () => {
+    it.each([
+      [
+        "paciente_nao_encontrado",
+        "nao_encontrado",
+        "Não encontrei nenhum cadastro com esse número.",
+      ],
+      [
+        "fora_da_janela",
+        "fora_da_janela",
+        "Sua consulta de hoje ainda não está no horário de check-in. Por favor, procure a recepção.",
+      ],
+      ["sem_agendamento_agora", "sem_agendamento", "Não encontrei agendamento para agora."],
+      [
+        "ja_registrado",
+        "chegada_ja_registrada",
+        "Sua chegada já estava registrada. Aguarde, você será chamado(a) em breve.",
+      ],
+      ["telefone_invalido", "telefone_invalido", "Digite o telefone com DDD."],
+    ])("uses the default text for %s without message", async (motivo, tipo, padrao) => {
+      fetchMock.mockResolvedValue(corpoNegocio(motivo));
+
+      const resultado = await localizarAgendamentoCheckin("11977778888");
+
+      expect(resultado).toEqual({ tipo, mensagem: padrao });
+    });
+
+    it.each([
+      [
+        "paciente_nao_encontrado",
+        "nao_encontrado",
+        "Não encontrei nenhum cadastro com esse número.",
+      ],
+      ["sem_agendamento_agora", "sem_agendamento", "Não encontrei agendamento para agora."],
+    ])("uses the default text for %s when message is blank", async (motivo, tipo, padrao) => {
+      fetchMock.mockResolvedValue(corpoNegocio(motivo, "   "));
+
+      const resultado = await localizarAgendamentoCheckin("11977778888");
+
+      expect(resultado).toEqual({ tipo, mensagem: padrao });
+    });
+
+    it("trims the CRM message when it has surrounding spaces", async () => {
+      fetchMock.mockResolvedValue(corpoNegocio("sem_agendamento_agora", "  Sem horário agora.  "));
+
+      const resultado = await localizarAgendamentoCheckin("11977778888");
+
+      expect(resultado).toEqual({ tipo: "sem_agendamento", mensagem: "Sem horário agora." });
+    });
+  });
+
+  describe("Cenário: Motivo fora da tabela", () => {
+    it("returns impedimento with the CRM message when dados_invalidos has a message", async () => {
+      fetchMock.mockResolvedValue(
+        corpoNegocio("dados_invalidos", "Faltou alguma informação para eu concluir.")
+      );
+
+      const resultado = await localizarAgendamentoCheckin("11977778888");
+
+      expect(resultado).toEqual({
+        tipo: "impedimento",
+        mensagem: "Faltou alguma informação para eu concluir.",
+      });
+      expect(JSON.stringify(resultado)).not.toContain("dados_invalidos");
+    });
+
+    it.each([
+      ["sem mensagem", undefined],
+      ["mensagem em branco", "   "],
+    ])("returns impedimento with the default text when dados_invalidos has %s", async (_r, msg) => {
+      fetchMock.mockResolvedValue(corpoNegocio("dados_invalidos", msg));
+
+      const resultado = await localizarAgendamentoCheckin("11977778888");
+
+      expect(resultado).toEqual({
+        tipo: "impedimento",
+        mensagem: "Não foi possível continuar seu check-in. Por favor, procure a recepção.",
+      });
+      expect(JSON.stringify(resultado)).not.toContain("dados_invalidos");
+    });
+
+    it("logs the unknown motivo with console.warn, desconhecido true and without the phone", async () => {
+      const info = vi.spyOn(console, "info").mockImplementation(() => {});
+      const warn = vi.spyOn(console, "warn").mockImplementation(() => {});
+      fetchMock.mockResolvedValue(corpoNegocio("dados_invalidos"));
+
+      await localizarAgendamentoCheckin("11977778888");
+
+      const linhasWarn = linhasLogLocalizar([warn]);
+      const todas = [...info.mock.calls, ...warn.mock.calls].map((a) => JSON.stringify(a));
+      info.mockRestore();
+      warn.mockRestore();
+      expect(linhasWarn).toHaveLength(1);
+      expect(linhasWarn[0]).toMatchObject({
+        evento: "crm.localizar",
+        motivo: "dados_invalidos",
+        desconhecido: true,
+      });
+      expect(typeof linhasWarn[0].categoria).toBe("string");
+      expect(typeof linhasWarn[0].duracaoMs).toBe("number");
+      expect(todas.filter((l) => l.includes("11977778888"))).toEqual([]);
+    });
+  });
+
+  describe("Log técnico de motivo conhecido", () => {
+    it("logs a known motivo with console.info, desconhecido false and without the phone", async () => {
+      const info = vi.spyOn(console, "info").mockImplementation(() => {});
+      const warn = vi.spyOn(console, "warn").mockImplementation(() => {});
+      fetchMock.mockResolvedValue(corpoNegocio("paciente_nao_encontrado", "Não achei."));
+
+      await localizarAgendamentoCheckin("11977778888");
+
+      const linhasInfo = linhasLogLocalizar([info]);
+      const todas = [...info.mock.calls, ...warn.mock.calls].map((a) => JSON.stringify(a));
+      const avisos = warn.mock.calls.length;
+      info.mockRestore();
+      warn.mockRestore();
+      expect(linhasInfo).toHaveLength(1);
+      expect(linhasInfo[0]).toMatchObject({
+        evento: "crm.localizar",
+        motivo: "paciente_nao_encontrado",
+        desconhecido: false,
+      });
+      expect(typeof linhasInfo[0].duracaoMs).toBe("number");
+      expect(avisos).toBe(0);
+      expect(todas.filter((l) => l.includes("11977778888"))).toEqual([]);
     });
   });
 });
@@ -404,5 +602,63 @@ describe("ativarTotemCheckin - bordas e ciclo completo", () => {
     const registrado = espioes.flatMap((e) => e.mock.calls).map((args) => JSON.stringify(args));
     espioes.forEach((e) => e.mockRestore());
     expect(registrado.filter((linha) => linha.includes(CHAVE_ACESSO))).toEqual([]);
+  });
+});
+
+describe("localizarAgendamentoCheckin - lacunas da auditoria", () => {
+  it("returns impedimento for motivo constructor", async () => {
+    fetchMock.mockResolvedValue(corpoNegocio("constructor"));
+
+    const resultado = await localizarAgendamentoCheckin("11977778888");
+
+    expect(resultado).toEqual({
+      tipo: "impedimento",
+      mensagem: "Não foi possível continuar seu check-in. Por favor, procure a recepção.",
+    });
+  });
+
+  it.each(["sem_agendamento_agora", "ja_registrado", "fora_da_janela"])(
+    "does not expose the raw motivo %s in the result",
+    async (motivo) => {
+      fetchMock.mockResolvedValue(corpoNegocio(motivo, "Texto do CRM."));
+
+      const resultado = await localizarAgendamentoCheckin("11977778888");
+
+      expect(resultado.tipo).not.toBe("indisponivel");
+      // `tipo` de fora_da_janela coincide com o motivo; o que não pode existir é o campo bruto.
+      expect(resultado).not.toHaveProperty("motivo");
+      expect(Object.values(resultado)).not.toContain(motivo === "fora_da_janela" ? "" : motivo);
+      expect(resultado).toMatchObject({ mensagem: "Texto do CRM." });
+    }
+  );
+
+  it("logs categoria sem_agendamento and a non-empty correlacao", async () => {
+    const info = vi.spyOn(console, "info").mockImplementation(() => {});
+    fetchMock.mockResolvedValue(corpoNegocio("sem_agendamento_agora", "Nada agora."));
+
+    await localizarAgendamentoCheckin("11977778888");
+
+    const linhas = linhasLogLocalizar([info]);
+    info.mockRestore();
+    expect(linhas).toHaveLength(1);
+    expect(linhas[0].categoria).toBe("sem_agendamento");
+    expect(typeof linhas[0].correlacao).toBe("string");
+    expect(linhas[0].correlacao.length).toBeGreaterThan(0);
+  });
+
+  it("logs categoria tecnico without motivo on a technical error (HTTP 401)", async () => {
+    const info = vi.spyOn(console, "info").mockImplementation(() => {});
+    const warn = vi.spyOn(console, "warn").mockImplementation(() => {});
+    fetchMock.mockResolvedValue(respostaHttp(respostaTokenInvalido));
+
+    await localizarAgendamentoCheckin("11987654321");
+
+    const linhas = linhasLogLocalizar([info, warn]);
+    info.mockRestore();
+    warn.mockRestore();
+    expect(linhas).toHaveLength(1);
+    expect(linhas[0].categoria).toBe("tecnico");
+    expect(linhas[0].motivo).toBeUndefined();
+    expect(linhas[0].desconhecido).toBe(false);
   });
 });

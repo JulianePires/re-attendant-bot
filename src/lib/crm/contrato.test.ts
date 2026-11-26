@@ -1,5 +1,9 @@
 import { describe, expect, it } from "vitest";
-import { interpretarRespostaLocalizar, montarRequisicaoLocalizar } from "./contrato";
+import {
+  classificarMotivo,
+  interpretarRespostaLocalizar,
+  montarRequisicaoLocalizar,
+} from "./contrato";
 import {
   respostaPacienteNaoEncontrado,
   respostaSucesso,
@@ -158,4 +162,35 @@ describe("interpretarRespostaLocalizar", () => {
       }
     );
   });
+});
+
+describe("classificarMotivo (Respostas sem agendamento / tabela de decisão motivo → categoria)", () => {
+  it.each([
+    ["telefone_invalido", "telefone_invalido"],
+    ["paciente_nao_encontrado", "nao_encontrado"],
+    ["fora_da_janela", "fora_da_janela"],
+    ["sem_agendamento_agora", "sem_agendamento"],
+    ["ja_registrado", "ja_registrado"],
+  ])("classifica o motivo %s como %s", (motivo, categoria) => {
+    expect(classificarMotivo(motivo)).toBe(categoria);
+  });
+
+  it.each([
+    ["dados_invalidos", "dados_invalidos"],
+    ["nao_encontrada (só existe na confirmação)", "nao_encontrada"],
+    ["string vazia", ""],
+    ["caixa diferente", "PACIENTE_NAO_ENCONTRADO"],
+    ["motivo qualquer", "qualquer_outro"],
+  ])("classifica %s como desconhecido", (_nome, motivo) => {
+    expect(classificarMotivo(motivo)).toBe("desconhecido");
+  });
+});
+
+describe("classificarMotivo: nomes do protótipo de objeto", () => {
+  it.each(["toString", "__proto__", "constructor"])(
+    "treats prototype name %s as desconhecido",
+    (motivo) => {
+      expect(classificarMotivo(motivo)).toBe("desconhecido");
+    }
+  );
 });

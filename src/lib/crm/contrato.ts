@@ -42,6 +42,30 @@ const schemaErroNegocio = z.object({
   mensagem: z.string().optional(),
 });
 
+export type CategoriaMotivo =
+  | "telefone_invalido"
+  | "nao_encontrado"
+  | "fora_da_janela"
+  | "sem_agendamento"
+  | "ja_registrado"
+  | "desconhecido";
+
+// Motivos da localização (REQ-001, tabela de motivos). `nao_encontrada` só existe
+// na confirmação; aqui ela cai em "desconhecido" como qualquer motivo novo.
+const CATEGORIA_POR_MOTIVO: Record<string, CategoriaMotivo> = {
+  telefone_invalido: "telefone_invalido",
+  paciente_nao_encontrado: "nao_encontrado",
+  fora_da_janela: "fora_da_janela",
+  sem_agendamento_agora: "sem_agendamento",
+  ja_registrado: "ja_registrado",
+};
+
+export function classificarMotivo(motivo: string): CategoriaMotivo {
+  return Object.hasOwn(CATEGORIA_POR_MOTIVO, motivo)
+    ? CATEGORIA_POR_MOTIVO[motivo]
+    : "desconhecido";
+}
+
 export function montarRequisicaoLocalizar(
   config: ConfigRequisicaoCrm,
   telefone: string
