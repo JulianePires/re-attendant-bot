@@ -50,8 +50,8 @@ const TEMPO_PARA_VOLTAR_MS: Partial<Record<Etapa, number>> = {
   TELEFONE: 30_000,
   CONFIRMAR: 30_000,
   FALAR_PROFISSIONAL: 30_000,
-  INDISPONIVEL: 30_000,
   NEGOCIO: 20_000,
+  INDISPONIVEL: 15_000,
   CHEGADA_REGISTRADA: 10_000,
   PROFISSIONAL_CHAMADO: 10_000,
 };
@@ -77,6 +77,11 @@ const BOTAO_SECUNDARIO =
 // Mesmo papel do botão de urgência do /recepcao; red-600 garante contraste AA com texto branco.
 const BOTAO_PROFISSIONAL =
   "flex min-h-16 w-full cursor-pointer items-center justify-center rounded-xl border border-red-700 bg-red-600 px-6 text-xl font-semibold text-white transition-all hover:bg-red-700 active:scale-[0.98] focus-visible:ring-4 focus-visible:ring-red-300 focus-visible:outline-none";
+
+// Os dois botões da tela inicial têm o mesmo tamanho; a cor diz qual é qual.
+// red-600 e emerald-700 garantem contraste AA com texto branco.
+const BOTAO_INICIAL =
+  "flex min-h-20 w-72 shrink-0 cursor-pointer items-center justify-center rounded-2xl border px-6 py-5 text-center text-xl font-semibold text-white transition-all active:scale-95 focus-visible:ring-4 focus-visible:outline-none";
 
 const CARTAO =
   "relative mx-auto flex w-full max-w-xl flex-col gap-5 rounded-3xl border border-sky-800/60 bg-sky-950/85 p-6 backdrop-blur-sm";
@@ -259,14 +264,14 @@ export function KioskCheckinFlow({ handleToggleTalking }: KioskCheckinFlowProps)
             <button
               type="button"
               onClick={irParaFalarComProfissional}
-              className={`${BOTAO_PROFISSIONAL} min-h-20 w-72`}
+              className={`${BOTAO_INICIAL} border-red-700 bg-red-600 hover:bg-red-700 focus-visible:ring-red-300`}
             >
               Falar com um profissional
             </button>
             <button
               type="button"
               onClick={irParaTelefone}
-              className="flex min-h-20 w-72 cursor-pointer flex-col items-center justify-center gap-1 rounded-2xl border border-emerald-500 bg-emerald-500 px-6 py-5 text-xl font-semibold text-white transition-all hover:bg-emerald-500/80 focus-visible:ring-4 focus-visible:ring-emerald-300 focus-visible:outline-none active:scale-95"
+              className={`${BOTAO_INICIAL} border-emerald-800 bg-emerald-700 hover:bg-emerald-800 focus-visible:ring-emerald-300`}
             >
               Tenho consulta agendada
             </button>

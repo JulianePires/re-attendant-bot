@@ -22,7 +22,10 @@ export type AgendamentoLocalizado = {
 export type ResultadoLocalizacao =
   | { tipo: "encontrado"; agendamento: AgendamentoLocalizado }
   | { tipo: "negocio"; motivo: string; mensagem?: string }
-  | { tipo: "tecnico"; causa: "status_http" | "resposta_invalida" | "sem_resposta" };
+  | {
+      tipo: "tecnico";
+      causa: "status_http" | "resposta_invalida" | "sem_resposta" | "tempo_esgotado";
+    };
 
 const textoObrigatorio = z.string().min(1);
 
